@@ -23,15 +23,21 @@ async function withLock(fn) {
 }
 
 function apply(st, b) {
-  const ms = st.matches, cur = S.currentIndex(ms);
+  const ms = st.matches, cur = S.currentIndex(ms, st.cur);
   if (b.op === "resetall") {
     if (b.confirm !== "RESET") throw err(400, "Konfirmasi salah");
     st.matches = S.initial();
+    st.cur = null;
     return;
   }
   const i = Number(b.i);
   if (!Number.isInteger(i) || i < 0 || i >= S.M) throw err(400, "Match tidak valid");
   const m = ms[i];
+  if (b.op === "setcurrent") {
+    if (m.done) throw err(409, "Match ini sudah selesai");
+    st.cur = i;
+    return;
+  }
   if (b.op === "point") {
     const s = Number(b.s);
     if (s !== 0 && s !== 1) throw err(400, "Sisi tidak valid");
@@ -40,7 +46,7 @@ function apply(st, b) {
     S.addPoint(m, s);
     return;
   }
-  if (i !== cur && i !== cur - 1) throw err(409, "Match ini sudah lewat");
+  if (i !== cur && !m.done && !m.hist.length) throw err(409, "Match ini belum dimulai");
   if (b.op === "undo") {
     if (!m.hist.length) throw err(409, "Tidak ada yang bisa di-undo");
     S.restore(m, m.hist.pop());
@@ -58,7 +64,7 @@ module.exports = async (req, res) => {
       const flat = (await cmd(["HGETALL", "ht:photov"])) || [];
       const photos = {};
       for (let i = 0; i + 1 < flat.length; i += 2) photos[flat[i]] = flat[i + 1];
-      return res.status(200).json({ rev: st.rev, matches: publicMatches(st.matches), photos });
+      return res.status(200).json({ rev: st.rev, cur: S.currentIndex(st.matches, st.cur), matches: publicMatches(st.matches), photos });
     }
     if (req.method === "POST") {
       const b = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
@@ -70,7 +76,7 @@ module.exports = async (req, res) => {
         await cmd(["SET", "ht:state", JSON.stringify(st)]);
         return st;
       });
-      return res.status(200).json({ rev: out.rev, matches: publicMatches(out.matches) });
+      return res.status(200).json({ rev: out.rev, cur: S.currentIndex(out.matches, out.cur), matches: publicMatches(out.matches) });
     }
     res.setHeader("Allow", "GET, POST");
     return res.status(405).json({ error: "Method not allowed" });

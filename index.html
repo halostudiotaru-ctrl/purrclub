@@ -293,14 +293,15 @@ function api(path,opt){
   });
 }
 function setOnline(v){if(online===v)return;online=v;var e=$("sync");if(e)e.textContent=v===null?"":(v?"● Live":"● Offline, coba lagi otomatis")}
-function adopt(remote){
+function adopt(remote,cur){
+  state.cur=typeof cur==="number"?cur:null;
   for(var i=0;i<M;i++){var r=remote[i],m=state.matches[i];m.games=r.games;m.p=r.p;m.adv=r.adv;m.deuceN=r.deuceN;m.sudden=r.sudden;m.done=r.done;m.hn=r.hn||0}
   try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
 }
 function sendOp(body){
   inflight++;
   return api("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
-    .then(function(r){setOnline(true);inflight--;if(inflight===0){adopt(r.matches);rev=r.rev;render()}})
+    .then(function(r){setOnline(true);inflight--;if(inflight===0){adopt(r.matches,r.cur);rev=r.rev;render()}})
     .catch(function(e){
       inflight--;
       if(e.status&&e.status<500){toast(e.message)}else{setOnline(false);toast("Gagal kirim skor, cek koneksi")}
@@ -311,7 +312,7 @@ function pull(force){
   return api("/api/state").then(function(s){
     setOnline(true);
     var changed=false;
-    if(s.matches&&(inflight===0||force)&&s.rev!==rev){adopt(s.matches);rev=s.rev;changed=true}
+    if(s.matches&&(inflight===0||force)&&s.rev!==rev){adopt(s.matches,s.cur);rev=s.rev;changed=true}
     var jobs=[];
     Object.keys(s.photos||{}).forEach(function(k){
       var p=+k;
@@ -356,7 +357,8 @@ function applyPoint(m,s){
 function curIdx(){var i=firstOpen();return i<0?M:i}
 function inMatch(i,p){var m=state.matches[i];return p!==null&&m.a.concat(m.b).indexOf(p)>=0}
 function canScore(i){return i===curIdx()&&!state.matches[i].done}
-function canAct(i){var c=curIdx();return i===c||i===c-1}
+function canAct(i){var m=state.matches[i];return i===curIdx()||m.done||(m.hn||0)>0}
+function setCurrent(i){var m=state.matches[i];if(m.done||i===curIdx())return;state.cur=i;render();sendOp({op:"setcurrent",i:i,p:me.p}).then(function(){toast("Match "+(i+1)+" sedang main")})}
 function addPoint(i,s){
   if(!canScore(i))return;
   var m=state.matches[i];
@@ -513,7 +515,7 @@ function banner(){
   if(c<0)return '';
   return '<s-banner class="gap" tone="info" heading="Match '+(c+1)+' sedang main">Siapa saja bisa mencatat poin di kartu bertanda ungu. Skor tampil live di semua HP.</s-banner>';
 }
-function firstOpen(){for(var i=0;i<M;i++)if(!state.matches[i].done)return i;return -1}
+function firstOpen(){var c=state.cur;if(typeof c==="number"&&c>=0&&c<M&&!state.matches[c].done)return c;for(var i=0;i<M;i++)if(!state.matches[i].done)return i;return -1}
 function nm(p){return p===me.p?'<span class="me-n">'+esc(PLAYERS[p])+'</span>':esc(PLAYERS[p])}
 
 function teamHtml(t,win){
@@ -550,6 +552,7 @@ function renderJadwal(){
       if(started||m.done)mini+=btn('variant="secondary" data-reset="'+i+'"','Reset match');
       if(mini)h+='<s-stack direction="inline" gap="small">'+mini+'</s-stack>';
     }
+    if(!m.done&&!live)h+='<s-stack direction="inline" gap="small">'+btn('variant="secondary" data-setcur="'+i+'"','Jadikan sedang main')+'</s-stack>';
     h+='<s-text color="subdued">Istirahat: '+esc(rest.map(function(k){return PLAYERS[k]}).join(", "))+'</s-text>';
     h+='</s-stack></s-section></article>';
   });
@@ -677,6 +680,7 @@ document.addEventListener("click",function(e){
   var t=e.target.closest("s-button, s-clickable, button");
   if(!t)return;
   if(t.dataset.pt){var x=t.dataset.pt.split(":");addPoint(+x[0],+x[1]);return}
+  if(t.dataset.setcur){setCurrent(+t.dataset.setcur);return}
   if(t.dataset.undo){undo(+t.dataset.undo);return}
   if(t.dataset.reset){
     var idx=+t.dataset.reset;
