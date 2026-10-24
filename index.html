@@ -9,6 +9,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Eater&family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.shopify.com/shopifycloud/polaris.js"></script>
 <style>
+.wrap{width:100%;max-width:1120px;margin:0 auto;padding:0 16px 40px}
+@media (min-width:700px){.wrap{max-width:880px;padding:0 24px 48px}}
+@media (min-width:1024px){.wrap{max-width:1120px;padding:0 32px 56px}}
+header{padding:22px 0 12px}
+.title{margin:0;font-weight:800;font-size:clamp(34px,9vw,52px);line-height:1.05;letter-spacing:-.02em;color:var(--pumpkin)}
+.sub{margin:8px 0 0;color:var(--muted);font-size:14.5px}
+#chip{margin-top:12px;display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.rules{display:block;margin-top:14px}
+.chip{display:inline-flex;align-items:center;min-block-size:44px;padding:5px 16px 5px 5px;border:1px solid var(--line);border-radius:999px;background:var(--surface);cursor:pointer}
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;gap:8px;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line)}
+.tabs>[data-tab]{flex:1;min-inline-size:0}
+.tools{margin-top:24px}
 :root{
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
@@ -127,21 +139,6 @@ body{
 #nopolaris{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;background:var(--bg);color:var(--ink);font-family:var(--font)}
 #nopolaris button{padding:12px 20px;border:0;border-radius:10px;background:var(--pumpkin);color:var(--pumpkin-ink);font:700 16px var(--font);cursor:pointer}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
-.wrap{max-width:640px;margin:0 auto;padding:0 14px 40px}
-header{padding:22px 0 12px}
-h1{font-family:'Eater','Barlow Condensed',cursive;font-weight:400;font-size:clamp(36px,11vw,56px);line-height:1;margin:0;color:var(--pumpkin);letter-spacing:.5px}
-.sub{margin:8px 0 0;color:var(--muted);font-size:14.5px}
-.sub a{color:var(--ink)}
-.rules{margin:14px 0 0;padding:12px 14px;background:var(--surface2);border-radius:10px;font-size:14px;color:var(--ink)}
-.rules b{font-weight:600}
-#chip{margin-top:12px}
-.chip{display:inline-flex;align-items:center;gap:10px;padding:6px 14px 6px 6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;font:600 15px 'Barlow',sans-serif;cursor:pointer}
-.chip.cta{padding:10px 16px;background:var(--pumpkin);color:var(--pumpkin-ink);border-color:var(--pumpkin)}
-.av{border-radius:50%;object-fit:cover;background:var(--pumpkin);color:var(--pumpkin-ink);display:inline-flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;flex:none}
-nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;gap:6px;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line)}
-nav button{flex:1;padding:10px 6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;font:600 15px 'Barlow',sans-serif;cursor:pointer}
-nav button[aria-selected="true"]{background:var(--pumpkin);color:var(--pumpkin-ink);border-color:var(--pumpkin)}
-button:focus-visible{outline:3px solid var(--live);outline-offset:2px}
 section{display:none;padding-top:14px}
 section.on{display:block}
 .banner{background:var(--surface2);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px}
@@ -191,9 +188,6 @@ td button.sm{padding:6px 10px;font-size:13px;border-color:var(--pumpkin);color:v
 .pcard h3{margin:0 0 6px;font-family:'Barlow Condensed',sans-serif;font-size:21px}
 .pcard p{margin:3px 0;font-size:14.5px}
 .pcard .k{color:var(--muted)}
-.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
-.tools button{padding:10px 14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;font:500 14px 'Barlow',sans-serif;cursor:pointer}
-.tools button.dg{color:var(--lose)}
 /* modal */
 .ov{position:fixed;inset:0;background:rgba(12,6,22,.62);display:none;align-items:flex-end;justify-content:center;z-index:50}
 .ov.on{display:flex}
@@ -222,27 +216,25 @@ td button.sm{padding:6px 10px;font-size:13px;border-color:var(--pumpkin);color:v
 <script>window.addEventListener("load",function(){if(!customElements.get("s-button"))document.getElementById("nopolaris").hidden=false})</script>
 <div class="wrap">
 <header>
-  <h1>Halloween Tennis</h1>
-  <p class="sub">Sabtu, 24 Okt · 17:00–22:00 · <a href="https://maps.app.goo.gl/8W14SVu49JueAfwQA?g_st=ic" target="_blank" rel="noopener">Medco Ampera</a></p>
+  <h1 class="title">Halloween Tennis</h1>
+  <p class="sub">Sabtu, 24 Okt · 17:00–22:00 · <s-link href="https://maps.app.goo.gl/8W14SVu49JueAfwQA?g_st=ic" target="_blank">Medco Ampera</s-link></p>
   <div id="chip"></div>
-  <div class="rules">
-    <b>Aturan:</b> doubles, partner berganti tiap match. Satu match sampai <b>4 game</b>. Setiap game: 15–30–40, <b>deuce hanya 1 kali</b>, deuce kedua jadi <b>sudden death</b> (poin berikutnya menang). 10 match × 30 menit di 1 lapangan, tiap orang main <b>4 kali</b>.
-  </div>
+  <s-banner class="rules" tone="info" heading="Aturan">
+    Doubles, partner berganti tiap match. Satu match sampai <b>4 game</b>. Setiap game: 15–30–40, <b>deuce hanya 1 kali</b>, deuce kedua jadi <b>sudden death</b> (poin berikutnya menang). 10 match × 30 menit di 1 lapangan, tiap orang main <b>4 kali</b>.
+  </s-banner>
 </header>
 
-<nav role="tablist">
-  <button role="tab" aria-selected="true" data-tab="jadwal">Jadwal</button>
-  <button role="tab" aria-selected="false" data-tab="klasemen">Klasemen</button>
-  <button role="tab" aria-selected="false" data-tab="pemain">Pemain</button>
+<nav class="tabs" role="tablist">
+  <s-button role="tab" aria-selected="true" variant="primary" inlineSize="fill" data-tab="jadwal"><span class="tap">Jadwal</span></s-button>
+  <s-button role="tab" aria-selected="false" variant="secondary" inlineSize="fill" data-tab="klasemen"><span class="tap">Klasemen</span></s-button>
+  <s-button role="tab" aria-selected="false" variant="secondary" inlineSize="fill" data-tab="pemain"><span class="tap">Pemain</span></s-button>
 </nav>
 
 <section id="jadwal" class="on"></section>
 <section id="klasemen"></section>
 <section id="pemain"></section>
 
-<div class="tools" id="tools">
-  <button class="dg" data-act="resetall">Hapus semua skor</button>
-</div>
+<div class="tools" id="tools"></div>
 </div>
 
 <div class="ov" id="ov"></div>
@@ -263,6 +255,7 @@ var rev=0,inflight=0,online=null,uploadingFor=null;
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function $(id){return document.getElementById(id)}
 function toast(t){var e=$("toast");e.textContent=t;e.style.display="block";clearTimeout(toastT);toastT=setTimeout(function(){e.style.display="none"},2800)}
+function btn(attrs,label){return '<s-button '+attrs+'><span class="tap">'+label+'</span></s-button>'}
 function slotTime(i){var mins=17*60+i*30;function f(x){var h=Math.floor(x/60),mi=x%60;return (h<10?"0":"")+h+":"+(mi<10?"0":"")+mi}return f(mins)+"–"+f(mins+30)}
 function freshMatch(f){return {a:[f[0],f[1]],b:[f[2],f[3]],games:[0,0],p:[0,0],adv:null,deuceN:0,sudden:false,done:false,hn:0}}
 function fixedSchedule(){var ms=[];for(var m=0;m<M;m++)ms.push(freshMatch(FIXED.slice(m*4,m*4+4)));return {matches:ms}}
@@ -374,16 +367,16 @@ function confirmBox(msg,okLabel){
 function answerConfirm(v){var p=pending;pending=null;var ov=$("ov");ov.classList.remove("on");ov.innerHTML="";if(p)p(v)}
 
 /* ---------- avatar & profil ---------- */
+function avatarSize(px){return px<=40?"small":px<=72?"large":"large-200"}
 function avatar(p,size){
-  var st='width:'+size+'px;height:'+size+'px;font-size:'+Math.round(size*0.55)+'px';
-  if(photos[p])return '<img class="av" style="'+st+'" alt="Foto '+esc(PLAYERS[p])+'" src="'+photos[p]+'">';
-  return '<span class="av" style="'+st+'">'+esc(PLAYERS[p].charAt(0))+'</span>';
+  var src=photos[p]?' src="'+photos[p]+'"':'';
+  return '<s-avatar'+src+' initials="'+esc(PLAYERS[p].charAt(0))+'" alt="'+esc(PLAYERS[p])+'" size="'+avatarSize(size)+'"></s-avatar>';
 }
 function renderChip(){
   var h;
-  if(me.p===null)h='<button class="chip cta" data-act="pick">Pilih namamu</button>';
-  else h='<button class="chip" data-act="profile">'+avatar(me.p,34)+'<span>Kamu: '+esc(PLAYERS[me.p])+'</span></button>';
-  h+='<span id="sync" class="note" style="margin-left:10px"></span>';
+  if(me.p===null)h=btn('variant="primary" data-act="pick"','Pilih namamu');
+  else h='<s-clickable class="chip" data-act="profile" accessibilityLabel="Profil '+esc(PLAYERS[me.p])+'"><s-stack direction="inline" alignItems="center" gap="small">'+avatar(me.p,34)+'<s-text type="strong">Kamu: '+esc(PLAYERS[me.p])+'</s-text></s-stack></s-clickable>';
+  h+='<s-text id="sync" color="subdued"></s-text>';
   $("chip").innerHTML=h;
   var se=$("sync");if(se&&online!==null)se.textContent=online?"● Live":"● Offline, coba lagi otomatis";
 }
@@ -547,7 +540,7 @@ function renderPemain(){
 }
 function render(){
   renderChip();renderJadwal();renderKlasemen();renderPemain();
-  $("tools").innerHTML='<button class="dg" data-act="resetall">Hapus semua skor</button>';
+  $("tools").innerHTML=btn('variant="secondary" tone="critical" data-act="resetall"','Hapus semua skor');
 }
 
 /* ---------- kartu recap (1080 x 1920, ukuran story) ---------- */
@@ -627,7 +620,7 @@ async function shareRecap(){
 
 /* ---------- event ---------- */
 document.addEventListener("click",function(e){
-  var t=e.target.closest("button");
+  var t=e.target.closest("s-button, s-clickable, button");
   if(!t){if(e.target.id==="ov"){if(pending)answerConfirm(false);else closeModal()}return}
   if(t.dataset.pt){var x=t.dataset.pt.split(":");addPoint(+x[0],+x[1]);return}
   if(t.dataset.undo){undo(+t.dataset.undo);return}
@@ -640,7 +633,7 @@ document.addEventListener("click",function(e){
     return;
   }
   if(t.dataset.tab){
-    document.querySelectorAll("nav button").forEach(function(b){b.setAttribute("aria-selected",b===t?"true":"false")});
+    document.querySelectorAll("nav [data-tab]").forEach(function(b){var on=b===t;b.setAttribute("aria-selected",on?"true":"false");b.setAttribute("variant",on?"primary":"secondary")});
     document.querySelectorAll("section").forEach(function(s){s.classList.toggle("on",s.id===t.dataset.tab)});
     window.scrollTo(0,0);return;
   }
