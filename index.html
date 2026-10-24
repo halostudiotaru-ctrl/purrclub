@@ -155,19 +155,15 @@ s-banner.gap{display:block;margin-bottom:16px}
 .pt{font-weight:700;font-size:26px;text-align:center;color:var(--ink);font-variant-numeric:tabular-nums}
 .state{text-align:center;font-weight:600;color:var(--live);min-height:22px}
 .pt-btn .tap{padding-block:14px}
-table{width:100%;border-collapse:collapse;font-size:15px}
-th,td{padding:9px 6px;text-align:center;border-bottom:1px solid var(--line)}
-th{font-weight:600;color:var(--muted);font-size:13px}
-td:first-child,th:first-child{text-align:left}
-td.name{font-weight:600}
-tr.top td.name{color:var(--pumpkin)}
-tr.mine td{background:var(--surface2)}
-td button.sm{padding:6px 10px;font-size:13px;border-color:var(--pumpkin);color:var(--pumpkin)}
-.tblWrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px 8px}
 .note{font-size:13.5px;color:var(--muted);margin:10px 2px}
-.recapCta{display:flex;align-items:center;gap:14px;background:var(--surface);border:2px solid var(--pumpkin);border-radius:14px;padding:14px;margin-bottom:12px}
-.recapCta h3{margin:0;font-family:'Barlow Condensed',sans-serif;font-size:22px}
-.recapCta p{margin:2px 0 8px;font-size:14px;color:var(--muted)}
+.kl{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;grid-template-areas:"side" "main"}
+.kl-side{grid-area:side}
+.kl-main{grid-area:main;min-width:0}
+@media (min-width:1024px){
+  .kl{grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"main side";align-items:start}
+  .kl-side{position:sticky;top:88px}
+}
+.topn{color:var(--pumpkin)}
 .pcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
 .pcard h3{margin:0 0 6px;font-family:'Barlow Condensed',sans-serif;font-size:21px}
 .pcard p{margin:3px 0;font-size:14.5px}
@@ -500,21 +496,21 @@ function renderJadwal(){
   $("jadwal").innerHTML=h+'</div>';
 }
 function renderKlasemen(){
-  var s=ranked(),h=banner();
+  var s=ranked(),h=banner()+'<div class="kl"><aside class="kl-side">';
   if(me.p!==null){
     var mine=s.filter(function(r){return r.i===me.p})[0];
-    h+='<div class="recapCta">'+avatar(me.p,64)+'<div><h3>Recap '+esc(PLAYERS[me.p])+'</h3><p>'+(mine.played?mine.played+' match selesai · '+mine.w+' menang':'Muncul setelah match pertamamu selesai')+'</p><button class="pri" data-act="recap" data-p="'+me.p+'">Lihat recap-ku</button></div></div>';
+    h+='<s-section><s-stack direction="inline" alignItems="center" gap="base">'+avatar(me.p,64)+'<s-stack gap="small-200"><s-heading>Recap '+esc(PLAYERS[me.p])+'</s-heading><s-text color="subdued">'+(mine.played?mine.played+' match selesai · '+mine.w+' menang':'Muncul setelah match pertamamu selesai')+'</s-text>'+btn('variant="primary" data-act="recap" data-p="'+me.p+'"','Lihat recap-ku')+'</s-stack></s-stack></s-section>';
   }else{
-    h+='<div class="recapCta"><div><h3>Mau recap sendiri?</h3><p>Pilih namamu dan ambil selfie dulu.</p><button class="pri" data-act="pick">Pilih namamu</button></div></div>';
+    h+='<s-section><s-stack gap="small-200"><s-heading>Mau recap sendiri?</s-heading><s-text color="subdued">Pilih namamu dan ambil selfie dulu.</s-text>'+btn('variant="primary" data-act="pick"','Pilih namamu')+'</s-stack></s-section>';
   }
-  h+='<div class="tblWrap"><table><thead><tr><th>Pemain</th><th>Main</th><th>M</th><th>K</th><th>Game</th><th>+/–</th><th></th></tr></thead><tbody>';
+  h+='</aside><div class="kl-main"><s-section padding="none"><s-table>';
+  h+='<s-table-header-row><s-table-header listSlot="primary">Pemain</s-table-header><s-table-header listSlot="labeled" format="numeric">Main</s-table-header><s-table-header listSlot="labeled" format="numeric">Menang</s-table-header><s-table-header listSlot="labeled" format="numeric">Kalah</s-table-header><s-table-header listSlot="labeled" format="numeric">Game</s-table-header><s-table-header listSlot="labeled" format="numeric">Selisih</s-table-header><s-table-header listSlot="inline"></s-table-header></s-table-header-row><s-table-body>';
   s.forEach(function(r,idx){
-    var d=r.gw-r.gl,cls=[];
-    if(idx===0&&r.played>0)cls.push("top");
-    if(r.i===me.p)cls.push("mine");
-    h+='<tr class="'+cls.join(" ")+'"><td class="name">'+(idx+1)+'. '+esc(r.name)+(r.i===me.p?' (kamu)':'')+'</td><td>'+r.played+'/'+r.sched+'</td><td>'+r.w+'</td><td>'+r.l+'</td><td>'+r.gw+'–'+r.gl+'</td><td>'+(d>0?'+':'')+d+'</td><td><button class="sm" data-act="recap" data-p="'+r.i+'">Recap</button></td></tr>';
+    var d=r.gw-r.gl,top=(idx===0&&r.played>0);
+    var name='<span'+(top?' class="topn"':'')+'><b>'+(idx+1)+'. '+esc(r.name)+'</b></span>'+(r.i===me.p?' <s-badge tone="info">kamu</s-badge>':'');
+    h+='<s-table-row><s-table-cell>'+name+'</s-table-cell><s-table-cell>'+r.played+'/'+r.sched+'</s-table-cell><s-table-cell>'+r.w+'</s-table-cell><s-table-cell>'+r.l+'</s-table-cell><s-table-cell>'+r.gw+'–'+r.gl+'</s-table-cell><s-table-cell>'+(d>0?'+':'')+d+'</s-table-cell><s-table-cell>'+btn('variant="tertiary" data-act="recap" data-p="'+r.i+'"','Recap')+'</s-table-cell></s-table-row>';
   });
-  h+='</tbody></table></div><p class="note">Urutan: jumlah menang, lalu selisih game. M = menang, K = kalah. Tiap pemain dijadwalkan sama: '+4+' match.</p>';
+  h+='</s-table-body></s-table></s-section><p class="note">Urutan: jumlah menang, lalu selisih game. Tiap pemain dijadwalkan sama: 4 match.</p></div></div>';
   $("klasemen").innerHTML=h;
 }
 function renderPemain(){
