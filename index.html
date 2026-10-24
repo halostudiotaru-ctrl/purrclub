@@ -153,6 +153,7 @@ section{display:none;padding-top:14px}
 section.on{display:block}
 .me-n{text-decoration:underline;text-decoration-color:var(--pumpkin);text-underline-offset:3px}
 s-banner.gap{display:block;margin-bottom:16px}
+s-stack.toolbar{display:flex;flex-wrap:wrap;margin-bottom:16px}
 .matches{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
 @media (min-width:700px){.matches{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .match{display:block;border-radius:16px}
@@ -216,7 +217,7 @@ s-banner.gap{display:block;margin-bottom:16px}
   <p class="sub">Sabtu, 24 Okt · 17:00–22:00 · <s-link href="https://maps.app.goo.gl/8W14SVu49JueAfwQA?g_st=ic" target="_blank">Medco Ampera</s-link></p>
   <div id="chip"></div>
   <s-banner class="rules" tone="info" heading="Aturan">
-    Doubles, partner berganti tiap match. Satu match sampai <b>4 game</b>. Setiap game: 15–30–40, <b>deuce hanya 1 kali</b>, deuce kedua jadi <b>sudden death</b> (poin berikutnya menang). 10 match × 30 menit di 1 lapangan, tiap orang main <b>4 kali</b>.
+    Doubles, partner berganti tiap match. Satu match sampai <b>4 game</b>. Setiap game: 15–30–40, <b>deuce hanya 1 kali</b>, deuce kedua jadi <b>sudden death</b> (poin berikutnya menang). 10 match × 30 menit di 1 lapangan, tiap orang main <b>4 kali</b>. Game manual dan pergantian pemain bisa ditambah di tab Jadwal.
   </s-banner>
 </header>
 
@@ -240,11 +241,12 @@ s-banner.gap{display:block;margin-bottom:16px}
 
 <script>
 (function(){
-var PLAYERS=["Angel","Faiz","Bella","Fai","Dian","Aryo","Aya","Rini","Norman","Fran"];
-var N=10,M=10,KEY="halloween-tennis-v3",MEKEY="halloween-tennis-me-v1";
+var DEFAULT_PLAYERS=["Angel","Faiz","Bella","Fai","Dian","Aryo","Aya","Rini","Norman","Fran"];
+var PLAYERS=DEFAULT_PLAYERS.slice();
+var DEFAULT_M=10,KEY="halloween-tennis-v3",MEKEY="halloween-tennis-me-v1";
 var BASE="https://claude.ai/artifact/UFPGpWiytzJERZ9XPK2Xsf";
 var FIXED=[1,2,9,7,0,8,6,3,7,2,4,5,1,6,3,9,0,5,8,4,7,3,9,6,2,5,0,1,7,4,8,9,6,0,5,1,8,3,4,2];
-var state=null,me={p:null,photo:null},photos={},photoVer={},pending=null,recapBlob=null,recapName="recap.png",toastT=null;
+var state=null,me={p:null,photo:null,name:null},photos={},photoVer={},pending=null,recapBlob=null,recapName="recap.png",toastT=null;
 var rev=0,inflight=0,online=null,uploadingFor=null;
 
 /* ---------- util ---------- */
@@ -277,14 +279,15 @@ function toast(t){
 }
 function btn(attrs,label){return '<s-button '+attrs+'><span class="tap">'+label+'</span></s-button>'}
 function slotTime(i){var mins=17*60+i*30;function f(x){var h=Math.floor(x/60),mi=x%60;return (h<10?"0":"")+h+":"+(mi<10?"0":"")+mi}return f(mins)+"–"+f(mins+30)}
-function freshMatch(f){return {a:[f[0],f[1]],b:[f[2],f[3]],games:[0,0],p:[0,0],adv:null,deuceN:0,sudden:false,done:false,hn:0}}
-function fixedSchedule(){var ms=[];for(var m=0;m<M;m++)ms.push(freshMatch(FIXED.slice(m*4,m*4+4)));return {matches:ms}}
+function freshMatch(f){return {a:[f[0],f[1]],b:[f[2],f[3]],manual:false,games:[0,0],p:[0,0],adv:null,deuceN:0,sudden:false,done:false,hn:0}}
+function fixedSchedule(){var ms=[];for(var m=0;m<DEFAULT_M;m++)ms.push(freshMatch(FIXED.slice(m*4,m*4+4)));return {players:DEFAULT_PLAYERS.slice(),cur:null,matches:ms}}
+function matchLabel(m,i){return m.manual?"Game manual":slotTime(i)}
 
 /* ---------- penyimpanan ---------- */
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
-function load(){try{var r=localStorage.getItem(KEY);if(r){var s=JSON.parse(r);if(s&&s.matches&&s.matches.length===M)return s}}catch(e){}return null}
+function load(){try{var r=localStorage.getItem(KEY);if(r){var s=JSON.parse(r);if(s&&s.matches&&s.matches.length>=1){if(!Array.isArray(s.players))s.players=DEFAULT_PLAYERS.slice();return s}}}catch(e){}return null}
 function saveMe(){try{localStorage.setItem(MEKEY,JSON.stringify(me))}catch(e){}}
-function loadMe(){try{var r=localStorage.getItem(MEKEY);if(r){var o=JSON.parse(r);if(o&&typeof o==="object")return {p:(typeof o.p==="number"?o.p:null),photo:o.photo||null}}}catch(e){}return {p:null,photo:null}}
+function loadMe(){try{var r=localStorage.getItem(MEKEY);if(r){var o=JSON.parse(r);if(o&&typeof o==="object")return {p:(typeof o.p==="number"?o.p:null),photo:o.photo||null,name:(typeof o.name==="string"?o.name:null)}}}catch(e){}return {p:null,photo:null,name:null}}
 
 /* ---------- sinkron (Vercel API) ---------- */
 function api(path,opt){
@@ -293,26 +296,39 @@ function api(path,opt){
   });
 }
 function setOnline(v){if(online===v)return;online=v;var e=$("sync");if(e)e.textContent=v===null?"":(v?"● Live":"● Offline, coba lagi otomatis")}
-function adopt(remote,cur){
-  state.cur=typeof cur==="number"?cur:null;
-  for(var i=0;i<M;i++){var r=remote[i],m=state.matches[i];m.games=r.games;m.p=r.p;m.adv=r.adv;m.deuceN=r.deuceN;m.sudden=r.sudden;m.done=r.done;m.hn=r.hn||0}
+function fixMe(){
+  if(me.p===null)return false;
+  if(me.p>=PLAYERS.length||(me.name&&PLAYERS[me.p]!==me.name)){me.p=null;me.photo=null;me.name=null;saveMe();return true}
+  if(!me.name){me.name=PLAYERS[me.p];saveMe()}
+  return false;
+}
+function adopt(r){
+  state.cur=typeof r.cur==="number"?r.cur:null;
+  if(Array.isArray(r.players))state.players=r.players;
+  PLAYERS=state.players;
+  state.matches=r.matches.map(function(m,i){
+    var old=state.matches[i]||{};
+    return {a:m.a||old.a||[0,1],b:m.b||old.b||[2,3],manual:!!m.manual,games:m.games,p:m.p,adv:m.adv,deuceN:m.deuceN,sudden:m.sudden,done:m.done,hn:m.hn||0};
+  });
+  if(fixMe()&&!modalIsOpen())pickPlayer();
   try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
 }
 function sendOp(body){
   inflight++;
   return api("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
-    .then(function(r){setOnline(true);inflight--;if(inflight===0){adopt(r.matches,r.cur);rev=r.rev;render()}})
+    .then(function(r){setOnline(true);inflight--;if(inflight===0){adopt(r);rev=r.rev;render()}return true})
     .catch(function(e){
       inflight--;
       if(e.status&&e.status<500){toast(e.message)}else{setOnline(false);toast("Gagal kirim skor, cek koneksi")}
       pull(true);
+      return false;
     });
 }
 function pull(force){
   return api("/api/state").then(function(s){
     setOnline(true);
     var changed=false;
-    if(s.matches&&(inflight===0||force)&&s.rev!==rev){adopt(s.matches,s.cur);rev=s.rev;changed=true}
+    if(s.matches&&(inflight===0||force)&&s.rev!==rev){adopt(s);rev=s.rev;changed=true}
     var jobs=[];
     Object.keys(s.photos||{}).forEach(function(k){
       var p=+k;
@@ -321,6 +337,13 @@ function pull(force){
         jobs.push(api("/api/photo?p="+p).then(function(r){if(r.photo){photos[p]=r.photo;changed=true}}).catch(function(){photoVer[p]=null}));
       }
     });
+    if(s.photos){
+      Object.keys(photos).forEach(function(k){
+        var p=+k;
+        if(s.photos[k]!==undefined||(p===me.p&&me.photo))return;
+        delete photos[p];delete photoVer[p];changed=true;
+      });
+    }
     return Promise.all(jobs).then(function(){
       if(me.p!==null&&me.photo&&!(s.photos&&s.photos[me.p]))uploadPhoto(me.p,me.photo);
       if(changed)render();
@@ -335,7 +358,7 @@ function uploadPhoto(p,data){
     .then(function(){uploadingFor=null});
 }
 function resetAllModal(){
-  openModal("Hapus semua skor?",'<s-paragraph>Ini menghapus skor semua match untuk semua orang. Ketik RESET untuk lanjut.</s-paragraph><s-text-field id="rstIn" label="Ketik RESET" placeholder="RESET" autocomplete="off"></s-text-field>',
+  openModal("Hapus semua skor?",'<s-paragraph>Ini menghapus semua skor, pemain manual, game manual, dan penggantian pemain, untuk semua orang. Ketik RESET untuk lanjut.</s-paragraph><s-text-field id="rstIn" label="Ketik RESET" placeholder="RESET" autocomplete="off"></s-text-field>',
     {secondary:{act:"close",label:"Batal"},primary:{act:"rstok",label:"Hapus skor",critical:true}});
 }
 
@@ -354,11 +377,11 @@ function applyPoint(m,s){
     else if(m.p[0]===3&&m.p[1]===3)m.deuceN=1;
   }
 }
-function curIdx(){var i=firstOpen();return i<0?M:i}
+function curIdx(){var i=firstOpen();return i<0?state.matches.length:i}
 function inMatch(i,p){var m=state.matches[i];return p!==null&&m.a.concat(m.b).indexOf(p)>=0}
 function canScore(i){return i===curIdx()&&!state.matches[i].done}
 function canAct(i){var m=state.matches[i];return i===curIdx()||m.done||(m.hn||0)>0}
-function setCurrent(i){var m=state.matches[i];if(m.done||i===curIdx())return;state.cur=i;render();sendOp({op:"setcurrent",i:i,p:me.p}).then(function(){toast("Match "+(i+1)+" sedang main")})}
+function setCurrent(i){var m=state.matches[i];if(m.done||i===curIdx())return;state.cur=i;render();sendOp({op:"setcurrent",i:i,p:me.p}).then(function(ok){if(ok)toast("Match "+(i+1)+" sedang main")})}
 function addPoint(i,s){
   if(!canScore(i))return;
   var m=state.matches[i];
@@ -394,6 +417,8 @@ function openModal(heading,bodyHtml,opts){
 }
 function closeModal(){modal.hideOverlay()}
 modal.addEventListener("hide",function(){
+  subCtx=null;
+  gameCtx=null;
   if(toastEl.parentNode===modal){document.body.appendChild(toastEl);if(toastOn)showToastEl()}
   if(pending){var p=pending;pending=null;p(false)}
 });
@@ -431,6 +456,47 @@ function pickPlayer(){
   h+='</div>';
   openModal("Kamu yang mana?",h,{secondary:{act:"close",label:"Nanti saja"}});
 }
+function pickBtn(attrs,p,sel){
+  return '<s-clickable class="pickItem'+(sel?' sel':'')+'" '+attrs+' accessibilityLabel="'+esc(PLAYERS[p])+'"><s-stack direction="inline" alignItems="center" gap="small">'+avatar(p,32)+'<s-text type="strong">'+esc(PLAYERS[p])+'</s-text></s-stack></s-clickable>';
+}
+var subCtx=null;
+function subPickModal(i){
+  subCtx={i:i,side:null,slot:null};
+  var m=state.matches[i],h='<s-paragraph color="subdued">Siapa yang diganti di Match '+(i+1)+'?</s-paragraph><div class="pick">';
+  [[0,0],[0,1],[1,0],[1,1]].forEach(function(x){
+    var p=(x[0]===0?m.a:m.b)[x[1]];
+    h+=pickBtn('data-act="subpick" data-side="'+x[0]+'" data-slot="'+x[1]+'"',p,false);
+  });
+  openModal("Ganti pemain",h+'</div>',{secondary:{act:"close",label:"Batal"}});
+}
+function subToModal(){
+  var m=state.matches[subCtx.i],inM=m.a.concat(m.b),h='<s-paragraph color="subdued">Diganti oleh siapa?</s-paragraph><div class="pick">';
+  PLAYERS.forEach(function(n,p){if(inM.indexOf(p)<0)h+=pickBtn('data-act="subto" data-p="'+p+'"',p,false)});
+  openModal("Pilih pengganti",h+'</div>',{secondary:{act:"close",label:"Batal"}});
+}
+function readName(id){return (($(id)||{}).value||"").trim().replace(/\s+/g," ")}
+function addPlayerModal(){
+  openModal("Pemain baru",'<s-text-field id="npIn" label="Nama pemain" placeholder="Nama" maxlength="20" autocomplete="off"></s-text-field>',{secondary:{act:"close",label:"Batal"},primary:{act:"npok",label:"Tambah"}});
+}
+var gameCtx=null;
+function gameModal(){
+  gameCtx={sel:[]};
+  openModal("Game manual",'<div id="gameBody"></div>',{secondary:{act:"close",label:"Batal"},primary:{act:"gamego",label:"Mulai game"}});
+  paintGame();
+}
+function paintGame(){
+  var box=$("gameBody");if(!box||!gameCtx)return;
+  var keep=($("gpIn")||{}).value||"";
+  var sel=gameCtx.sel=gameCtx.sel.filter(function(p){return p<PLAYERS.length});
+  function nameAt(k){return sel[k]!==undefined?PLAYERS[sel[k]]:"…"}
+  var h='<s-stack gap="base"><s-paragraph color="subdued">Pilih 4 pemain. Dua yang pertama jadi Tim A, dua berikutnya Tim B. Ketuk lagi untuk batal.</s-paragraph>';
+  h+='<s-text type="strong">Tim A: '+esc(nameAt(0)+" & "+nameAt(1))+'</s-text><s-text type="strong">Tim B: '+esc(nameAt(2)+" & "+nameAt(3))+'</s-text><div class="pick">';
+  PLAYERS.forEach(function(n,p){h+=pickBtn('data-act="gametoggle" data-p="'+p+'"',p,sel.indexOf(p)>=0)});
+  h+='</div><s-stack direction="inline" gap="small" alignItems="end"><s-text-field id="gpIn" label="Pemain baru" placeholder="Nama" maxlength="20" autocomplete="off"></s-text-field>'+btn('variant="secondary" data-act="gameaddplayer"','Tambah')+'</s-stack></s-stack>';
+  box.innerHTML=h;
+  var f=$("gpIn");if(f)f.value=keep;
+  var go=modal.querySelector('[data-act="gamego"]');if(go)go.toggleAttribute("disabled",sel.length!==4);
+}
 function selfieStep(){
   var h='<s-stack alignItems="center" gap="base">'+avatar(me.p,140)+'<s-paragraph color="subdued">Foto dipakai di kartu recap dan tersimpan di HP ini saja.</s-paragraph></s-stack>';
   h+='<s-stack gap="small">'+btn('variant="primary" inlineSize="fill" data-act="selfie"',me.photo?'Ambil ulang selfie':'Ambil selfie')+btn('variant="secondary" inlineSize="fill" data-act="gallery"','Pilih dari galeri')+btn('variant="tertiary" inlineSize="fill" data-act="close"',me.photo?'Selesai':'Lewati')+'</s-stack>';
@@ -438,7 +504,7 @@ function selfieStep(){
 }
 function profileModal(){
   var h='<s-stack gap="base"><s-stack alignItems="center" gap="base">'+avatar(me.p,120)+'</s-stack>';
-  h+='<s-stack gap="small">'+btn('variant="primary" inlineSize="fill" data-act="recap" data-p="'+me.p+'"','Lihat recap-ku')+btn('variant="secondary" inlineSize="fill" data-act="selfiestep"',me.photo?'Ganti foto':'Tambah selfie')+btn('variant="secondary" inlineSize="fill" data-act="pick"','Ganti pemain')+btn('variant="tertiary" inlineSize="fill" data-act="close"','Tutup')+'</s-stack></s-stack>';
+  h+='<s-stack gap="small">'+btn('variant="primary" inlineSize="fill" data-act="recap" data-p="'+me.p+'"','Lihat recap-ku')+btn('variant="secondary" inlineSize="fill" data-act="selfiestep"',me.photo?'Ganti foto':'Tambah selfie')+btn('variant="secondary" inlineSize="fill" data-act="pick"','Bukan aku')+btn('variant="tertiary" inlineSize="fill" data-act="close"','Tutup')+'</s-stack></s-stack>';
   openModal(PLAYERS[me.p],h);
 }
 function processFile(file){
@@ -515,7 +581,7 @@ function banner(){
   if(c<0)return '';
   return '<s-banner class="gap" tone="info" heading="Match '+(c+1)+' sedang main">Siapa saja bisa mencatat poin di kartu bertanda ungu. Skor tampil live di semua HP.</s-banner>';
 }
-function firstOpen(){var c=state.cur;if(typeof c==="number"&&c>=0&&c<M&&!state.matches[c].done)return c;for(var i=0;i<M;i++)if(!state.matches[i].done)return i;return -1}
+function firstOpen(){var n=state.matches.length,c=state.cur;if(typeof c==="number"&&c>=0&&c<n&&!state.matches[c].done)return c;for(var i=0;i<n;i++)if(!state.matches[i].done)return i;return -1}
 function nm(p){return p===me.p?'<span class="me-n">'+esc(PLAYERS[p])+'</span>':esc(PLAYERS[p])}
 
 function teamHtml(t,win){
@@ -523,7 +589,7 @@ function teamHtml(t,win){
   return '<s-stack alignItems="center" gap="small-200"><s-text type="strong"'+tone+'>'+nm(t[0])+'</s-text><s-text type="strong"'+tone+'>'+nm(t[1])+'</s-text></s-stack>';
 }
 function renderJadwal(){
-  var cur=firstOpen(),h=banner()+'<div class="matches">';
+  var cur=firstOpen(),h=banner()+'<s-stack class="toolbar" direction="inline" gap="small">'+btn('variant="secondary" data-act="addgame"','+ Game manual')+btn('variant="secondary" data-act="addplayer"','+ Pemain baru')+'</s-stack><div class="matches">';
   state.matches.forEach(function(m,i){
     var players=m.a.concat(m.b);
     var rest=PLAYERS.map(function(_,k){return k}).filter(function(k){return players.indexOf(k)<0});
@@ -532,7 +598,7 @@ function renderJadwal(){
     var tone=m.done?'success':live?'info':'neutral',label=m.done?'Selesai':live?'Giliran main':'Menunggu';
     var started=m.games[0]+m.games[1]+m.p[0]+m.p[1]>0||m.adv!==null;
     h+='<article class="match'+(live?' live':'')+(m.done?' done':'')+'"><s-section><s-stack gap="base">';
-    h+='<s-stack direction="inline" justifyContent="space-between" alignItems="center" gap="small"><s-heading>Match '+(i+1)+' · '+slotTime(i)+'</s-heading><s-badge tone="'+tone+'">'+label+'</s-badge></s-stack>';
+    h+='<s-stack direction="inline" justifyContent="space-between" alignItems="center" gap="small"><s-heading>Match '+(i+1)+' · '+matchLabel(m,i)+'</s-heading><s-badge tone="'+tone+'">'+label+'</s-badge></s-stack>';
     h+='<s-grid gridTemplateColumns="1fr auto 1fr" alignItems="center" gap="base">'+teamHtml(m.a,winA)+'<s-text color="subdued">lawan</s-text>'+teamHtml(m.b,winB)+'</s-grid>';
     h+='<s-grid gridTemplateColumns="1fr auto 1fr" alignItems="center" gap="base"><div class="games">'+m.games[0]+'</div><s-text color="subdued">game</s-text><div class="games">'+m.games[1]+'</div></s-grid>';
     if(canScore(i)){
@@ -552,7 +618,11 @@ function renderJadwal(){
       if(started||m.done)mini+=btn('variant="secondary" data-reset="'+i+'"','Reset match');
       if(mini)h+='<s-stack direction="inline" gap="small">'+mini+'</s-stack>';
     }
-    if(!m.done&&!live)h+='<s-stack direction="inline" gap="small">'+btn('variant="secondary" data-setcur="'+i+'"','Jadikan sedang main')+'</s-stack>';
+    if(!m.done){
+      var mgmt=btn('variant="secondary" data-sub="'+i+'"','Ganti pemain');
+      if(!live)mgmt+=btn('variant="secondary" data-setcur="'+i+'"','Jadikan sedang main');
+      h+='<s-stack direction="inline" gap="small">'+mgmt+'</s-stack>';
+    }
     h+='<s-text color="subdued">Istirahat: '+esc(rest.map(function(k){return PLAYERS[k]}).join(", "))+'</s-text>';
     h+='</s-stack></s-section></article>';
   });
@@ -575,7 +645,7 @@ function renderKlasemen(){
     var num=function(v,lbl,lo){return '<s-table-cell'+(lo?' class="lo"':'')+'><span class="num">'+(lbl?'<span class="lbl">'+lbl+' </span>':'')+v+'</span></s-table-cell>'};
     h+='<s-table-row><s-table-cell>'+name+'</s-table-cell>'+num(r.played+'/'+r.sched,'',1)+num(r.w,'Menang')+num(r.l,'Kalah')+num(r.gw+'–'+r.gl,'',1)+num((d>0?'+':'')+d,'Selisih')+'<s-table-cell><span class="rc">'+btn('variant="secondary" data-act="recap" data-p="'+r.i+'"','Recap')+'</span></s-table-cell></s-table-row>';
   });
-  h+='</s-table-body></s-table></s-section><p class="note">Urutan: jumlah menang, lalu selisih game. Tiap pemain dijadwalkan sama: 4 match.</p></div></div>';
+  h+='</s-table-body></s-table></s-section><p class="note">Urutan: jumlah menang, lalu selisih game. Kolom Main: match selesai / total match pemain, termasuk game manual.</p></div></div>';
   $("klasemen").innerHTML=h;
 }
 function renderPemain(){
@@ -588,7 +658,7 @@ function renderPemain(){
       var team=side===0?m.a:m.b,other=side===0?m.b:m.a;
       partners.push(PLAYERS[team[0]===p?team[1]:team[0]]);
       other.forEach(function(o){opps[PLAYERS[o]]=(opps[PLAYERS[o]]||0)+1});
-      slots.push("Match "+(i+1)+" ("+slotTime(i).split("–")[0]+")");
+      slots.push("Match "+(i+1)+" ("+(m.manual?"game manual":slotTime(i).split("–")[0])+")");
     });
     var ol=Object.keys(opps).map(function(k){return k+(opps[k]>1?" ×"+opps[k]:"")}).join(", ");
     h+='<div class="pcard"><s-section heading="'+esc(n)+(p===me.p?' (kamu)':'')+'"><s-stack gap="small-200"><s-paragraph><s-text color="subdued">Main di:</s-text> '+esc(slots.join(", "))+'</s-paragraph><s-paragraph><s-text color="subdued">Partner:</s-text> '+esc(partners.join(", "))+'</s-paragraph><s-paragraph><s-text color="subdued">Lawan:</s-text> '+esc(ol)+'</s-paragraph></s-stack></s-section></div>';
@@ -629,7 +699,7 @@ async function drawRecap(d){
   x.font="700 58px "+F_NUM;var tw=x.measureText(d.title).width+90;
   rr(x,540-tw/2,925,tw,86,43);x.fillStyle="#ff8a1f";x.fill();
   x.fillStyle="#241733";x.fillText(d.title,540,988);
-  var boxes=[["Menang–kalah",d.w+"–"+d.l],["Game menang–kalah",d.gw+"–"+d.gl],["Selisih game",(d.diff>0?"+":"")+d.diff],["Peringkat dari 10","#"+d.rank]];
+  var boxes=[["Menang–kalah",d.w+"–"+d.l],["Game menang–kalah",d.gw+"–"+d.gl],["Selisih game",(d.diff>0?"+":"")+d.diff],["Peringkat dari "+PLAYERS.length,"#"+d.rank]];
   boxes.forEach(function(b,k){
     var bx=80+(k%2)*480,by=1060+Math.floor(k/2)*190;
     rr(x,bx,by,440,170,26);x.fillStyle="rgba(255,255,255,.09)";x.fill();
@@ -686,10 +756,11 @@ document.addEventListener("click",function(e){
     var idx=+t.dataset.reset;
     confirmBox("Reset skor Match "+(idx+1)+"?","Reset match").then(function(ok){
       if(!ok||!canAct(idx))return;
-      sendOp({op:"resetmatch",i:idx,p:me.p}).then(function(){toast("Match "+(idx+1)+" direset")});
+      sendOp({op:"resetmatch",i:idx,p:me.p}).then(function(ok){if(ok)toast("Match "+(idx+1)+" direset")});
     });
     return;
   }
+  if(t.dataset.sub){subPickModal(+t.dataset.sub);return}
   if(t.dataset.tab){
     document.querySelectorAll("nav [data-tab]").forEach(function(b){var on=b===t;b.setAttribute("accessibilityLabel",b.textContent.trim()+(on?", dipilih":""));b.setAttribute("variant",on?"primary":"secondary")});
     document.querySelectorAll("section").forEach(function(s){s.classList.toggle("on",s.id===t.dataset.tab)});
@@ -703,10 +774,40 @@ document.addEventListener("click",function(e){
   else if(a==="rstok"){
     var v=(($("rstIn")||{}).value||"").trim().toUpperCase();
     if(v!=="RESET"){toast("Ketik RESET dulu");return}
-    closeModal();sendOp({op:"resetall",confirm:"RESET"}).then(function(){toast("Semua skor dihapus")});
+    closeModal();sendOp({op:"resetall",confirm:"RESET"}).then(function(ok){if(ok)toast("Semua skor dihapus")});
+  }
+  else if(a==="subpick"&&subCtx){subCtx.side=+t.dataset.side;subCtx.slot=+t.dataset.slot;subToModal()}
+  else if(a==="subto"&&subCtx){
+    var sc=subCtx,sp=+t.dataset.p;
+    closeModal();
+    sendOp({op:"substitute",i:sc.i,side:sc.side,slot:sc.slot,p:sp}).then(function(ok){if(ok)toast("Pemain diganti: "+PLAYERS[sp])});
+  }
+  else if(a==="addplayer"){addPlayerModal()}
+  else if(a==="npok"){
+    var nn=readName("npIn");
+    if(!nn){toast("Isi namanya dulu");return}
+    closeModal();
+    sendOp({op:"addplayer",name:nn}).then(function(ok){if(ok)toast("Pemain ditambahkan: "+nn)});
+  }
+  else if(a==="addgame"){gameModal()}
+  else if(a==="gametoggle"&&gameCtx){
+    var gp=+t.dataset.p,gi=gameCtx.sel.indexOf(gp);
+    if(gi>=0)gameCtx.sel.splice(gi,1);else if(gameCtx.sel.length<4)gameCtx.sel.push(gp);
+    paintGame();
+  }
+  else if(a==="gameaddplayer"&&gameCtx){
+    var gn=readName("gpIn");
+    if(!gn){toast("Isi namanya dulu");return}
+    sendOp({op:"addplayer",name:gn}).then(function(ok){if(ok){toast("Pemain ditambahkan: "+gn);var f=$("gpIn");if(f)f.value="";paintGame()}});
+  }
+  else if(a==="gamego"&&gameCtx){
+    var gs=gameCtx.sel.slice();
+    if(gs.length!==4)return;
+    closeModal();
+    sendOp({op:"addmatch",a:[gs[0],gs[1]],b:[gs[2],gs[3]]}).then(function(ok){if(ok)toast("Game manual ditambahkan")});
   }
   else if(a==="pick"){pickPlayer()}
-  else if(a==="choose"){var np=+t.dataset.p;if(np!==me.p)me.photo=null;me.p=np;saveMe();render();selfieStep()}
+  else if(a==="choose"){var np=+t.dataset.p;if(np!==me.p)me.photo=null;me.p=np;me.name=PLAYERS[np];saveMe();render();selfieStep()}
   else if(a==="profile"){profileModal()}
   else if(a==="selfiestep"){selfieStep()}
   else if(a==="selfie"){$("selfieIn").value="";$("selfieIn").click()}
@@ -717,12 +818,19 @@ document.addEventListener("click",function(e){
 });
 $("selfieIn").addEventListener("change",function(e){processFile(e.target.files&&e.target.files[0])});
 $("galleryIn").addEventListener("change",function(e){processFile(e.target.files&&e.target.files[0])});
-document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target&&e.target.id==="rstIn"){e.preventDefault();document.querySelector('[data-act="rstok"]').click()}});
+document.addEventListener("keydown",function(e){
+  if(e.key!=="Enter"||!e.target)return;
+  var act=e.target.id==="rstIn"?"rstok":e.target.id==="npIn"?"npok":e.target.id==="gpIn"?"gameaddplayer":null;
+  if(!act)return;
+  e.preventDefault();document.querySelector('[data-act="'+act+'"]').click();
+});
 
 /* ---------- mulai ---------- */
 me=loadMe();
 if(me.photo&&me.p!==null)photos[me.p]=me.photo;
 state=load()||fixedSchedule();
+PLAYERS=state.players;
+fixMe();
 render();
 if(me.p===null)setTimeout(pickPlayer,350);
 pull(true);
