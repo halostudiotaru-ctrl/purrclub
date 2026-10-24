@@ -56,3 +56,12 @@ test("notice stays hidden when polaris.js loads", async () => {
   assert.equal(await page.locator("#nopolaris").isVisible(), false);
   await ctx.close();
 });
+
+test("no dead styles or legacy markup classes remain", () => {
+  const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  const css = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+  const dead = [".ov", ".sheet", ".mtxt", ".mrow", ".linkbox", ".pri{", ".ghost{", ".danger{", ".tblWrap", ".recapCta", ".banner{", ".mh{", ".btns", "button.sm", "nav button"];
+  assert.deepEqual(dead.filter((d) => css.includes(d)), []);
+  const body = html.slice(html.indexOf("<body>"));
+  assert.equal(/class="(pri|ghost|danger|tblWrap|recapCta|sheet|mrow)\b/.test(body), false);
+});

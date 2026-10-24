@@ -13,7 +13,11 @@
 - Hapus semua skor: tersedia di bawah halaman, harus mengetik RESET.
 - Recap: tombol Recap di tab Klasemen.
 
+## Tampilan
+UI memakai Shopify Polaris web components (`s-button`, `s-table`, `s-modal`, dll.) dari CDN `cdn.shopify.com/shopifycloud/polaris.js`, dengan warna Purrclub dan font Plus Jakarta Sans. Perlu koneksi internet untuk memuat komponen; jika gagal, muncul tombol "Muat ulang".
+
 ## Isi
+- `tests/ui/`  tes UI (Playwright + Chrome). Jalankan: `cd tests/ui && npm install && npm test`. Perlu Node 20 atau lebih baru (playwright-core 1.64) dan koneksi internet (komponen Polaris dan font dimuat dari CDN). `node shoot.mjs` membuat 24 screenshot di `tests/ui/out/` untuk review visual.
 - `index.html`  halaman aplikasi
 - `api/state.js`  baca skor dan terima aksi poin/undo/reset (dengan kunci supaya ketukan bersamaan tidak hilang)
 - `api/photo.js`  baca/tulis foto selfie
