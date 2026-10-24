@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Halloween Tennis – Medco Ampera</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Eater&family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Eater&family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.shopify.com/shopifycloud/polaris.js"></script>
 <style>
 :root{
   box-sizing:border-box;
@@ -13,23 +15,117 @@
   padding-bottom:env(safe-area-inset-bottom,0px);
   --bg:#f6efe0; --surface:#fffaf0; --surface2:#efe3cb; --ink:#241733; --muted:#6b5a78;
   --pumpkin:#d9560b; --pumpkin-ink:#ffffff; --line:#d9c9a8; --win:#2f7d4f; --lose:#a8324a; --live:#6a3fb5;
+  --font:'Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',sans-serif; --lose-ink:#ffffff;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#160e22; --surface:#231636; --surface2:#2f1f47; --ink:#f3ead8; --muted:#a898bd;
     --pumpkin:#ff8a1f; --pumpkin-ink:#241733; --line:#3d2b58; --win:#7ed6a0; --lose:#ff8aa0; --live:#b99cff;
+    --lose-ink:#241733;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#160e22; --surface:#231636; --surface2:#2f1f47; --ink:#f3ead8; --muted:#a898bd;
   --pumpkin:#ff8a1f; --pumpkin-ink:#241733; --line:#3d2b58; --win:#7ed6a0; --lose:#ff8aa0; --live:#b99cff;
+  --lose-ink:#241733;
   color-scheme:dark;
 }
 html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
 *,*::before,*::after{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:'Barlow',system-ui,sans-serif;font-size:16px;line-height:1.45;min-height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.45;min-height:100%}
+[hidden]{display:none!important}
+
+/* Polaris web components theme: Purrclub palette -> Polaris tokens.
+   Token names are per component; "f4125" is Polaris's build hash.
+   tests/ui/foundation.test.mjs fails if a name here disappears from polaris.js. */
+body{
+  --p-font-family-sans-f4125:var(--font);
+  --tint-win:color-mix(in srgb,var(--win) 18%,var(--surface));
+  --tint-lose:color-mix(in srgb,var(--lose) 16%,var(--surface));
+  --tint-live:color-mix(in srgb,var(--live) 16%,var(--surface));
+
+  /* surfaces, text, borders */
+  --p-color-bg-f4125:var(--bg);
+  --p-color-bg-surface-f4125:var(--surface);
+  --p-color-bg-surface-hover-f4125:var(--surface2);
+  --p-color-bg-surface-active-f4125:var(--surface2);
+  --p-color-bg-surface-secondary-f4125:var(--surface2);
+  --p-color-bg-surface-secondary-hover-f4125:var(--surface2);
+  --p-color-bg-surface-secondary-active-f4125:var(--surface2);
+  --p-color-bg-surface-tertiary-f4125:var(--surface2);
+  --p-color-bg-fill-tertiary-f4125:var(--surface2);
+  --p-color-border-f4125:var(--line);
+  --p-color-border-secondary-f4125:var(--line);
+  --p-color-border-focus-f4125:var(--live);
+  --p-color-text-f4125:var(--ink);
+  --p-color-text-secondary-f4125:var(--muted);
+  --p-color-text-tertiary-f4125:var(--muted);
+  --p-color-text-link-f4125:var(--ink);
+  --p-color-text-link-hover-f4125:var(--pumpkin);
+  --p-color-text-link-active-f4125:var(--pumpkin);
+
+  /* primary button */
+  --p-color-button-primary-bg-f4125:var(--pumpkin);
+  --p-color-button-primary-bg-hover-f4125:color-mix(in srgb,var(--pumpkin) 85%,black);
+  --p-color-button-primary-bg-active-f4125:color-mix(in srgb,var(--pumpkin) 72%,black);
+  --p-color-button-primary-text-f4125:var(--pumpkin-ink);
+  --p-color-button-primary-text-hover-f4125:var(--pumpkin-ink);
+  --p-color-button-primary-text-active-f4125:var(--pumpkin-ink);
+  /* critical primary button */
+  --p-color-button-primary-bg-critical-f4125:var(--lose);
+  --p-color-button-primary-bg-critical-hover-f4125:color-mix(in srgb,var(--lose) 85%,black);
+  --p-color-button-primary-bg-critical-active-f4125:color-mix(in srgb,var(--lose) 72%,black);
+  --p-color-button-primary-text-critical-f4125:var(--lose-ink);
+  /* secondary button */
+  --p-color-button-bg-fill-f4125:var(--surface);
+  --p-color-button-bg-fill-hover-f4125:var(--surface2);
+  --p-color-button-bg-fill-active-f4125:var(--surface2);
+  --p-color-button-gradient-bg-fill-f4125:var(--surface);
+  --p-color-button-bg-fill-critical-f4125:var(--surface);
+  --p-color-button-bg-fill-critical-hover-f4125:var(--tint-lose);
+  --p-color-button-bg-fill-critical-active-f4125:var(--tint-lose);
+  --p-color-button-gradient-bg-fill-critical-f4125:var(--surface);
+  --p-color-text-critical-f4125:var(--lose);
+
+  /* inputs */
+  --p-color-input-bg-surface-f4125:var(--bg);
+  --p-color-input-bg-surface-hover-f4125:var(--bg);
+  --p-color-input-bg-surface-active-f4125:var(--bg);
+  --p-color-input-border-f4125:var(--line);
+  --p-color-input-border-hover-f4125:var(--muted);
+  --p-color-input-border-active-f4125:var(--live);
+
+  /* badges + banner */
+  --p-color-bg-fill-success-secondary-f4125:var(--tint-win);
+  --p-color-badge-bg-fill-success-f4125:var(--tint-win);
+  --p-color-badge-text-success-f4125:var(--win);
+  --p-color-bg-fill-critical-secondary-f4125:var(--tint-lose);
+  --p-color-badge-bg-fill-critical-f4125:var(--tint-lose);
+  --p-color-badge-text-critical-f4125:var(--lose);
+  --p-color-bg-fill-info-secondary-f4125:var(--tint-live);
+  --p-color-badge-bg-fill-info-f4125:var(--tint-live);
+  --p-color-badge-text-info-f4125:var(--live);
+  --p-color-bg-surface-info-f4125:var(--tint-live);
+  --p-color-icon-info-accent-f4125:var(--live);
+  --p-color-text-success-f4125:var(--win);
+
+  /* avatars: Polaris picks one of seven colors by initials; make all pumpkin */
+  --p-color-avatar-text-on-bg-fill-f4125:var(--pumpkin-ink);
+  --p-color-avatar-one-bg-fill-f4125:var(--pumpkin);   --p-color-avatar-one-text-on-bg-fill-f4125:var(--pumpkin-ink);
+  --p-color-avatar-two-bg-fill-f4125:var(--pumpkin);   --p-color-avatar-two-text-on-bg-fill-f4125:var(--pumpkin-ink);
+  --p-color-avatar-three-bg-fill-f4125:var(--pumpkin); --p-color-avatar-three-text-on-bg-fill-f4125:var(--pumpkin-ink);
+  --p-color-avatar-four-bg-fill-f4125:var(--pumpkin);  --p-color-avatar-four-text-on-bg-fill-f4125:var(--pumpkin-ink);
+  --p-color-avatar-five-bg-fill-f4125:var(--pumpkin);  --p-color-avatar-five-text-on-bg-fill-f4125:var(--pumpkin-ink);
+  --p-color-avatar-six-bg-fill-f4125:var(--pumpkin);   --p-color-avatar-six-text-on-bg-fill-f4125:var(--pumpkin-ink);
+  --p-color-avatar-seven-bg-fill-f4125:var(--pumpkin); --p-color-avatar-seven-text-on-bg-fill-f4125:var(--pumpkin-ink);
+}
+
+/* touch-target helper: wrap button labels so buttons are >= 44px tall */
+.tap{display:block;padding-block:8px;line-height:1.3;text-align:center}
+#nopolaris{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;background:var(--bg);color:var(--ink);font-family:var(--font)}
+#nopolaris button{padding:12px 20px;border:0;border-radius:10px;background:var(--pumpkin);color:var(--pumpkin-ink);font:700 16px var(--font);cursor:pointer}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
 .wrap{max-width:640px;margin:0 auto;padding:0 14px 40px}
 header{padding:22px 0 12px}
@@ -119,6 +215,11 @@ td button.sm{padding:6px 10px;font-size:13px;border-color:var(--pumpkin);color:v
 </style>
 </head>
 <body>
+<div id="nopolaris" hidden>
+  <p>Tampilan gagal dimuat. Cek koneksi internet, lalu muat ulang.</p>
+  <button type="button" onclick="location.reload()">Muat ulang</button>
+</div>
+<script>window.addEventListener("load",function(){if(!customElements.get("s-button"))document.getElementById("nopolaris").hidden=false})</script>
 <div class="wrap">
 <header>
   <h1>Halloween Tennis</h1>
