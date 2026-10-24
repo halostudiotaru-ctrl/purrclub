@@ -404,6 +404,7 @@ function openModal(heading,bodyHtml,opts){
 }
 function closeModal(){modal.hideOverlay()}
 modal.addEventListener("hide",function(){
+  subCtx=null;
   if(toastEl.parentNode===modal){document.body.appendChild(toastEl);if(toastOn)showToastEl()}
   if(pending){var p=pending;pending=null;p(false)}
 });
@@ -440,6 +441,24 @@ function pickPlayer(){
   PLAYERS.forEach(function(n,i){h+='<s-clickable class="pickItem'+(i===me.p?' sel':'')+'" data-act="choose" data-p="'+i+'" accessibilityLabel="'+esc(n)+'"><s-stack direction="inline" alignItems="center" gap="small">'+avatar(i,32)+'<s-text type="strong">'+esc(n)+'</s-text></s-stack></s-clickable>'});
   h+='</div>';
   openModal("Kamu yang mana?",h,{secondary:{act:"close",label:"Nanti saja"}});
+}
+function pickBtn(attrs,p,sel){
+  return '<s-clickable class="pickItem'+(sel?' sel':'')+'" '+attrs+' accessibilityLabel="'+esc(PLAYERS[p])+'"><s-stack direction="inline" alignItems="center" gap="small">'+avatar(p,32)+'<s-text type="strong">'+esc(PLAYERS[p])+'</s-text></s-stack></s-clickable>';
+}
+var subCtx=null;
+function subPickModal(i){
+  subCtx={i:i,side:null,slot:null};
+  var m=state.matches[i],h='<s-paragraph color="subdued">Siapa yang diganti di Match '+(i+1)+'?</s-paragraph><div class="pick">';
+  [[0,0],[0,1],[1,0],[1,1]].forEach(function(x){
+    var p=(x[0]===0?m.a:m.b)[x[1]];
+    h+=pickBtn('data-act="subpick" data-side="'+x[0]+'" data-slot="'+x[1]+'"',p,false);
+  });
+  openModal("Ganti pemain",h+'</div>',{secondary:{act:"close",label:"Batal"}});
+}
+function subToModal(){
+  var m=state.matches[subCtx.i],inM=m.a.concat(m.b),h='<s-paragraph color="subdued">Diganti oleh siapa?</s-paragraph><div class="pick">';
+  PLAYERS.forEach(function(n,p){if(inM.indexOf(p)<0)h+=pickBtn('data-act="subto" data-p="'+p+'"',p,false)});
+  openModal("Pilih pengganti",h+'</div>',{secondary:{act:"close",label:"Batal"}});
 }
 function selfieStep(){
   var h='<s-stack alignItems="center" gap="base">'+avatar(me.p,140)+'<s-paragraph color="subdued">Foto dipakai di kartu recap dan tersimpan di HP ini saja.</s-paragraph></s-stack>';
@@ -562,7 +581,11 @@ function renderJadwal(){
       if(started||m.done)mini+=btn('variant="secondary" data-reset="'+i+'"','Reset match');
       if(mini)h+='<s-stack direction="inline" gap="small">'+mini+'</s-stack>';
     }
-    if(!m.done&&!live)h+='<s-stack direction="inline" gap="small">'+btn('variant="secondary" data-setcur="'+i+'"','Jadikan sedang main')+'</s-stack>';
+    if(!m.done){
+      var mgmt=btn('variant="secondary" data-sub="'+i+'"','Ganti pemain');
+      if(!live)mgmt+=btn('variant="secondary" data-setcur="'+i+'"','Jadikan sedang main');
+      h+='<s-stack direction="inline" gap="small">'+mgmt+'</s-stack>';
+    }
     h+='<s-text color="subdued">Istirahat: '+esc(rest.map(function(k){return PLAYERS[k]}).join(", "))+'</s-text>';
     h+='</s-stack></s-section></article>';
   });
@@ -700,6 +723,7 @@ document.addEventListener("click",function(e){
     });
     return;
   }
+  if(t.dataset.sub){subPickModal(+t.dataset.sub);return}
   if(t.dataset.tab){
     document.querySelectorAll("nav [data-tab]").forEach(function(b){var on=b===t;b.setAttribute("accessibilityLabel",b.textContent.trim()+(on?", dipilih":""));b.setAttribute("variant",on?"primary":"secondary")});
     document.querySelectorAll("section").forEach(function(s){s.classList.toggle("on",s.id===t.dataset.tab)});
@@ -714,6 +738,12 @@ document.addEventListener("click",function(e){
     var v=(($("rstIn")||{}).value||"").trim().toUpperCase();
     if(v!=="RESET"){toast("Ketik RESET dulu");return}
     closeModal();sendOp({op:"resetall",confirm:"RESET"}).then(function(){toast("Semua skor dihapus")});
+  }
+  else if(a==="subpick"&&subCtx){subCtx.side=+t.dataset.side;subCtx.slot=+t.dataset.slot;subToModal()}
+  else if(a==="subto"&&subCtx){
+    var sc=subCtx,sp=+t.dataset.p;
+    closeModal();
+    sendOp({op:"substitute",i:sc.i,side:sc.side,slot:sc.slot,p:sp}).then(function(ok){if(ok)toast("Pemain diganti: "+PLAYERS[sp])});
   }
   else if(a==="pick"){pickPlayer()}
   else if(a==="choose"){var np=+t.dataset.p;if(np!==me.p)me.photo=null;me.p=np;saveMe();render();selfieStep()}
