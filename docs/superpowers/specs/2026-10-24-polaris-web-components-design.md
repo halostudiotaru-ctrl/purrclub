@@ -30,11 +30,15 @@ Tested standalone (no Shopify admin, no App Bridge) in headless Chrome:
    variables (`var(--pumpkin)` etc.), so the existing light/dark switching carries over with no
    second set of values. It lives in one place so the `f4125` hash is a one-line fix if Shopify rebuilds.
 3. **Keep the custom `:root` palette variables** as the single source of truth for colors.
-4. **Keep non-component brand pieces**: the Eater `h1`, and the large Barlow Condensed scoreboard digits.
-   There is no Polaris component for a scoreboard, and Polaris has no display typeface.
-   All other text uses Polaris typography. *(Assumption — flag if you want Barlow everywhere.)*
+4. **Font: Plus Jakarta Sans everywhere** (Google Fonts, weights 400/500/600/700/800). Set
+   `--p-font-family-sans-f4125` in the theme block so every Polaris component uses it, and set it on
+   `body` for custom elements. This **replaces Eater (h1) and Barlow / Barlow Condensed (scoreboard,
+   headings)**. The title and the large score digits stay as custom elements (no Polaris equivalent), but
+   in Plus Jakarta Sans at weight 800, with `font-variant-numeric: tabular-nums` on the digits.
 5. **Keep the custom toast** (`#toast`), restyled with palette variables. App Home toasts need App Bridge, which isn't available here.
-6. **Recap card unchanged.** It is drawn on a canvas from data, not captured from the DOM.
+6. **Recap card unchanged.** It is drawn on a canvas from data, not captured from the DOM. Because the
+   canvas still uses Eater / Barlow, keep those Google Fonts links loaded (alongside Plus Jakarta Sans),
+   or the story image would silently fall back to a default font. Switching the recap to Plus Jakarta Sans is a separate, optional change.
 
 ## Component mapping
 
@@ -77,11 +81,35 @@ Esc itself; its `hide` event runs the existing "resolve pending confirm as false
 - The Enter-to-confirm handler keeps keying off `id="rstIn"` on the `s-text-field`; the value is read from `.value`.
 - Render functions keep building HTML strings; only the markup they emit changes. Custom elements work in `innerHTML`.
 
-## Standings on mobile
+## Layout: phone and iPad
 
-`s-table variant="auto"` renders as a **list on narrow screens**, which is where this app is used.
-The seven columns map to `listSlot`: name = `primary`, Main/M/K/Game/+– = `labeled` or `inline`, Recap button = `inline`.
-This is the largest visual change. If the list layout reads worse than today's grid for 11 players
+Today the page is a single column capped at 640px, which leaves an iPad mostly empty. Targets: phone
+portrait (~390px), iPad portrait (768px) and iPad landscape (1024px+). Layout is driven by CSS
+breakpoints on the outer shell plus `s-grid` columns, not by device sniffing.
+
+| | Phone (<700px) | iPad portrait (700–1023px) | iPad landscape (≥1024px) |
+|---|---|---|---|
+| Page width | full width, 16px gutter | max 880px, centered, 24px gutter | max 1120px, centered, 32px gutter |
+| Tabs | full-width row, 3 equal buttons | same | same |
+| Jadwal (matches) | 1 column | 2 columns of match cards | 2 columns |
+| Klasemen | recap CTA above, standings below | same, standings full width | **two panes**: standings (left, ~2/3) + recap CTA (right, sticky) |
+| Pemain cards | 1 column | 2 columns | 3 columns |
+| Pick-player modal | 2 columns | 3 columns | 3 columns |
+| Modal | `size="base"`, slides as sheet | `size="base"` | `size="base"` |
+| Score digits | 48px | 56px | 64px |
+
+Rules for all sizes:
+- Touch targets ≥ 44px; the `+ Poin` buttons ≥ 56px tall since they are tapped mid-game.
+- Respect `env(safe-area-inset-*)` as now (notch, home bar).
+- Orientation change must reflow without a reload (CSS only; no JS width checks).
+- The live match card stays first-visible: on 2-column layouts it spans both columns so the scoring buttons are never half-width on a small iPad.
+
+## Standings table
+
+`s-table variant="auto"` renders as a **list on narrow containers** and a real table when wide, so
+phone gets the list and iPad gets the full table automatically. The seven columns map to `listSlot`:
+name = `primary`, Main/M/K/Game/+– = `labeled` or `inline`, Recap button = `inline`.
+The phone list is the largest visual change. If it reads worse than today's grid for 11 players
 × 6 numbers, the fallback is to drop *Main* and *Game* from the narrow view. Decide after seeing it rendered.
 
 ## Failure mode
@@ -94,13 +122,13 @@ show a plain-HTML notice with a reload button. (State polling already requires n
 
 The repo has no test suite and no build step. Verify by:
 
-1. Headless Chrome screenshots (as in the spike) of each tab, each modal, light and dark, at ~390px and ~640px.
+1. Headless Chrome screenshots (as in the spike) of each tab, each modal, light and dark, at 390px (phone), 768px (iPad portrait) and 1180px (iPad landscape).
 2. Click-through in a real browser: pick player, add point, undo, reset match, reset all (RESET gate), recap open/share/save, tab switching, selfie flow.
 3. Check no console errors and that the avatar and dark-mode tokens are covered.
 
 ## Out of scope
 
-Scoring rules, API, Redis, recap card artwork, fonts for the `h1` and scoreboard, replacing the toast.
+Scoring rules, API, Redis, recap card artwork (it keeps its own canvas fonts and layout), replacing the toast.
 
 ## Open items to resolve while building
 
