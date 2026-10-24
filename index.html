@@ -129,6 +129,8 @@ body{
   --p-color-text-info-on-bg-fill-f4125:var(--ink);
   --p-color-icon-info-accent-f4125:var(--live);
   --p-color-text-success-f4125:var(--win);
+  /* neutral badge ("Menunggu"): default is a near-invisible rgba(0,0,0,.06) pill */
+  --p-color-bg-fill-transparent-secondary-f4125:var(--surface2);
 
   /* avatars: Polaris picks one of seven colors by initials; make all pumpkin */
   --p-color-avatar-text-on-bg-fill-f4125:var(--pumpkin-ink);
@@ -168,11 +170,23 @@ s-banner.gap{display:block;margin-bottom:16px}
 .kl-main{grid-area:main;min-width:0}
 @media (min-width:1024px){
   .kl{grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"main side";align-items:start}
-  .kl-side{position:sticky;top:88px}
+  .kl-side{position:sticky;top:calc(88px + env(safe-area-inset-top,0px))}
 }
 .topn{color:var(--pumpkin)}
 /* Polaris right-aligns numeric headers but not their cells; match them */
 .num{display:block;text-align:end;font-variant-numeric:tabular-nums}
+.pn{display:inline-flex;align-items:center;flex-wrap:wrap;gap:6px}
+.lbl{display:none}
+/* s-table switches to its list layout below 490px viewport width (polaris.js: innerWidth>=490 ? table : list).
+   Compact phone list: name + Recap on one row, Menang/Kalah/Selisih inline, Main/Game hidden. */
+@media (max-width:489.98px){
+  #klasemen s-table-cell.lo{display:none}
+  #klasemen .num{display:inline;margin-inline-end:10px}
+  #klasemen .lbl{display:inline;color:var(--muted)}
+  /* button keeps its 44px+ box but overlaps the row padding instead of growing the row */
+  #klasemen .rc{display:block;margin-block:-11px}
+}
+.big-av{display:inline-flex;align-items:center;justify-content:center;flex:none;border-radius:50%;object-fit:cover;background:var(--pumpkin);color:var(--pumpkin-ink);font-family:var(--font);font-weight:800;line-height:1}
 .pgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
 @media (min-width:700px){.pgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (min-width:1024px){.pgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -184,7 +198,9 @@ s-banner.gap{display:block;margin-bottom:16px}
 .pickItem.sel{border-color:var(--pumpkin);background:var(--surface2)}
 .rbox{display:flex;justify-content:center;margin-bottom:12px}
 .rbox img{max-height:58vh;max-width:100%;width:auto;border-radius:12px;border:1px solid var(--line)}
-#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;font-family:var(--font);z-index:60;display:none;max-width:90%;text-align:center}
+/* popover=manual puts the toast in the top layer, above the open s-modal <dialog>; reset the popover UA box */
+#toast{position:fixed;inset:auto auto calc(24px + env(safe-area-inset-bottom,0px)) 50%;margin:0;border:0;width:fit-content;height:auto;overflow:visible;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;font-family:var(--font);z-index:60;display:none;max-width:90%;text-align:center}
+#toast:popover-open{display:block}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -204,10 +220,10 @@ s-banner.gap{display:block;margin-bottom:16px}
   </s-banner>
 </header>
 
-<nav class="tabs" role="tablist">
-  <s-button role="tab" aria-selected="true" variant="primary" inlineSize="fill" data-tab="jadwal"><span class="tap">Jadwal</span></s-button>
-  <s-button role="tab" aria-selected="false" variant="secondary" inlineSize="fill" data-tab="klasemen"><span class="tap">Klasemen</span></s-button>
-  <s-button role="tab" aria-selected="false" variant="secondary" inlineSize="fill" data-tab="pemain"><span class="tap">Pemain</span></s-button>
+<nav class="tabs" aria-label="Bagian halaman">
+  <s-button accessibilityLabel="Jadwal, dipilih" variant="primary" inlineSize="fill" data-tab="jadwal"><span class="tap">Jadwal</span></s-button>
+  <s-button accessibilityLabel="Klasemen" variant="secondary" inlineSize="fill" data-tab="klasemen"><span class="tap">Klasemen</span></s-button>
+  <s-button accessibilityLabel="Pemain" variant="secondary" inlineSize="fill" data-tab="pemain"><span class="tap">Pemain</span></s-button>
 </nav>
 
 <section id="jadwal" class="on"></section>
@@ -218,7 +234,7 @@ s-banner.gap{display:block;margin-bottom:16px}
 </div>
 
 <s-modal id="modal" heading=""></s-modal>
-<div id="toast" role="status"></div>
+<div id="toast" role="status" popover="manual"></div>
 <input type="file" id="selfieIn" accept="image/*" capture="user" hidden>
 <input type="file" id="galleryIn" accept="image/*" hidden>
 
@@ -234,7 +250,31 @@ var rev=0,inflight=0,online=null,uploadingFor=null;
 /* ---------- util ---------- */
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function $(id){return document.getElementById(id)}
-function toast(t){var e=$("toast");e.textContent=t;e.style.display="block";clearTimeout(toastT);toastT=setTimeout(function(){e.style.display="none"},2800)}
+/* toast: a popover="manual" so it sits in the top layer above the s-modal <dialog>.
+   While the modal is open everything outside it is inert (no hit testing, hidden from screen readers),
+   so the toast element is moved inside the open modal and back to <body> when it closes. */
+var toastEl=$("toast"),toastOn=false;
+function modalIsOpen(){var d=modal.shadowRoot&&modal.shadowRoot.querySelector("dialog");return !!(d&&d.open)}
+function showToastEl(){
+  var e=toastEl;
+  if(typeof e.showPopover==="function"){try{if(e.matches(":popover-open"))e.hidePopover();e.showPopover();return}catch(x){}}
+  e.style.display="block";
+}
+function hideToastEl(){
+  var e=toastEl;
+  if(typeof e.hidePopover==="function"){try{if(e.matches(":popover-open"))e.hidePopover()}catch(x){}}
+  e.style.display="";
+}
+function homeToast(){
+  var host=modalIsOpen()?modal:document.body;
+  if(toastEl.parentNode!==host){host.appendChild(toastEl);if(toastOn)showToastEl()}
+}
+function toast(t){
+  toastEl.textContent=t;toastOn=true;
+  homeToast();showToastEl();
+  clearTimeout(toastT);
+  toastT=setTimeout(function(){toastOn=false;hideToastEl()},2800);
+}
 function btn(attrs,label){return '<s-button '+attrs+'><span class="tap">'+label+'</span></s-button>'}
 function slotTime(i){var mins=17*60+i*30;function f(x){var h=Math.floor(x/60),mi=x%60;return (h<10?"0":"")+h+":"+(mi<10?"0":"")+mi}return f(mins)+"–"+f(mins+30)}
 function freshMatch(f){return {a:[f[0],f[1]],b:[f[2],f[3]],games:[0,0],p:[0,0],adv:null,deuceN:0,sudden:false,done:false,hn:0}}
@@ -345,11 +385,16 @@ function openModal(heading,bodyHtml,opts){
   if(opts.primary)h+=btn('slot="primary-action" variant="primary"'+(opts.primary.critical?' tone="critical"':'')+' data-act="'+opts.primary.act+'"',esc(opts.primary.label));
   modal.setAttribute("heading",heading||"");
   modal.setAttribute("size",opts.size||"base");
+  if(toastEl.parentNode===modal)document.body.appendChild(toastEl);
   modal.innerHTML=h;
   modal.showOverlay();
+  homeToast();
 }
 function closeModal(){modal.hideOverlay()}
-modal.addEventListener("hide",function(){if(pending){var p=pending;pending=null;p(false)}});
+modal.addEventListener("hide",function(){
+  if(toastEl.parentNode===modal){document.body.appendChild(toastEl);if(toastOn)showToastEl()}
+  if(pending){var p=pending;pending=null;p(false)}
+});
 function confirmBox(msg,okLabel){
   return new Promise(function(res){
     pending=res;
@@ -361,7 +406,13 @@ function answerConfirm(v){var p=pending;pending=null;modal.hideOverlay();if(p)p(
 /* ---------- avatar & profil ---------- */
 function avatarSize(px){return px<=40?"small":px<=72?"large":"large-200"}
 function avatar(p,size){
-  var src=photos[p]?' src="'+photos[p]+'"':'';
+  var n=PLAYERS[p];
+  if(size>=64){
+    /* s-avatar tops out around 40px; draw big previews ourselves */
+    var st=' style="width:'+size+'px;height:'+size+'px;font-size:'+Math.round(size*.45)+'px"';
+    return photos[p]?'<img class="big-av" alt="'+esc(n)+'" src="'+esc(photos[p])+'"'+st+'>':'<span class="big-av" role="img" aria-label="'+esc(n)+'"'+st+'>'+esc(n.charAt(0))+'</span>';
+  }
+  var src=photos[p]?' src="'+esc(photos[p])+'"':'';
   return '<s-avatar'+src+' initials="'+esc(PLAYERS[p].charAt(0))+'" alt="'+esc(PLAYERS[p])+'" size="'+avatarSize(size)+'"></s-avatar>';
 }
 function renderChip(){
@@ -460,7 +511,7 @@ function titleFor(d){
 function banner(){
   var c=firstOpen();
   if(c<0)return '';
-  return '<s-banner class="gap" tone="info" heading="Match '+(c+1)+' sedang main">Siapa saja bisa mencatat poin di kartu bertanda biru. Skor tampil live di semua HP.</s-banner>';
+  return '<s-banner class="gap" tone="info" heading="Match '+(c+1)+' sedang main">Siapa saja bisa mencatat poin di kartu bertanda ungu. Skor tampil live di semua HP.</s-banner>';
 }
 function firstOpen(){for(var i=0;i<M;i++)if(!state.matches[i].done)return i;return -1}
 function nm(p){return p===me.p?'<span class="me-n">'+esc(PLAYERS[p])+'</span>':esc(PLAYERS[p])}
@@ -513,12 +564,13 @@ function renderKlasemen(){
     h+='<s-section><s-stack gap="small-200"><s-heading>Mau recap sendiri?</s-heading><s-text color="subdued">Pilih namamu dan ambil selfie dulu.</s-text>'+btn('variant="primary" data-act="pick"','Pilih namamu')+'</s-stack></s-section>';
   }
   h+='</aside><div class="kl-main"><s-section padding="none"><s-table>';
-  h+='<s-table-header-row><s-table-header listSlot="primary">Pemain</s-table-header><s-table-header listSlot="labeled" format="numeric">Main</s-table-header><s-table-header listSlot="labeled" format="numeric">Menang</s-table-header><s-table-header listSlot="labeled" format="numeric">Kalah</s-table-header><s-table-header listSlot="labeled" format="numeric">Game</s-table-header><s-table-header listSlot="labeled" format="numeric">Selisih</s-table-header><s-table-header listSlot="inline"></s-table-header></s-table-header-row><s-table-body>';
+  h+='<s-table-header-row><s-table-header listSlot="primary">Pemain</s-table-header><s-table-header listSlot="inline" format="numeric">Main</s-table-header><s-table-header listSlot="inline" format="numeric">Menang</s-table-header><s-table-header listSlot="inline" format="numeric">Kalah</s-table-header><s-table-header listSlot="inline" format="numeric">Game</s-table-header><s-table-header listSlot="inline" format="numeric">Selisih</s-table-header><s-table-header listSlot="secondary">Recap</s-table-header></s-table-header-row><s-table-body>';
   s.forEach(function(r,idx){
     var d=r.gw-r.gl,top=(idx===0&&r.played>0);
-    var name='<span'+(top?' class="topn"':'')+'><b>'+(idx+1)+'. '+esc(r.name)+'</b></span>'+(r.i===me.p?' <s-badge tone="info">kamu</s-badge>':'');
-    var num=function(v){return '<s-table-cell><span class="num">'+v+'</span></s-table-cell>'};
-    h+='<s-table-row><s-table-cell>'+name+'</s-table-cell>'+num(r.played+'/'+r.sched)+num(r.w)+num(r.l)+num(r.gw+'–'+r.gl)+num((d>0?'+':'')+d)+'<s-table-cell>'+btn('variant="tertiary" data-act="recap" data-p="'+r.i+'"','Recap')+'</s-table-cell></s-table-row>';
+    var name='<span class="pn"><b'+(top?' class="topn"':'')+'>'+(idx+1)+'. '+esc(r.name)+'</b>'+(r.i===me.p?'<s-badge tone="info">kamu</s-badge>':'')+'</span>';
+    /* lbl: visible label in the phone list only; lo: column hidden in the phone list */
+    var num=function(v,lbl,lo){return '<s-table-cell'+(lo?' class="lo"':'')+'><span class="num">'+(lbl?'<span class="lbl">'+lbl+' </span>':'')+v+'</span></s-table-cell>'};
+    h+='<s-table-row><s-table-cell>'+name+'</s-table-cell>'+num(r.played+'/'+r.sched,'',1)+num(r.w,'Menang')+num(r.l,'Kalah')+num(r.gw+'–'+r.gl,'',1)+num((d>0?'+':'')+d,'Selisih')+'<s-table-cell><span class="rc">'+btn('variant="secondary" data-act="recap" data-p="'+r.i+'"','Recap')+'</span></s-table-cell></s-table-row>';
   });
   h+='</s-table-body></s-table></s-section><p class="note">Urutan: jumlah menang, lalu selisih game. Tiap pemain dijadwalkan sama: 4 match.</p></div></div>';
   $("klasemen").innerHTML=h;
@@ -635,7 +687,7 @@ document.addEventListener("click",function(e){
     return;
   }
   if(t.dataset.tab){
-    document.querySelectorAll("nav [data-tab]").forEach(function(b){var on=b===t;b.setAttribute("aria-selected",on?"true":"false");b.setAttribute("variant",on?"primary":"secondary")});
+    document.querySelectorAll("nav [data-tab]").forEach(function(b){var on=b===t;b.setAttribute("accessibilityLabel",b.textContent.trim()+(on?", dipilih":""));b.setAttribute("variant",on?"primary":"secondary")});
     document.querySelectorAll("section").forEach(function(s){s.classList.toggle("on",s.id===t.dataset.tab)});
     window.scrollTo(0,0);return;
   }

@@ -53,6 +53,41 @@ test("recap buttons are s-buttons >= 44px tall and open the recap", async () => 
   await ctx.close();
 });
 
+test("phone: compact standings list, name and Recap on one row, Main/Game hidden", async () => {
+  const { page, ctx } = await klasemen({ width: 390, height: 844 });
+  await page.waitForTimeout(300);
+  const hs = await page.evaluate(() =>
+    [...document.querySelectorAll("#klasemen s-table-row")].map((r) => r.shadowRoot.querySelector("section").getBoundingClientRect().height));
+  assert.equal(hs.length, 10);
+  const avg = hs.reduce((a, b) => a + b, 0) / hs.length;
+  assert.ok(avg <= 110, `average row height ${avg}px (rows: ${hs.map(Math.round)})`);
+  const rec = page.locator('#klasemen s-table-row [data-act="recap"] button').first();
+  assert.equal(await rec.isVisible(), true);
+  const rb = await rec.boundingBox();
+  assert.ok(rb.height >= 44 - 0.01, `recap button ${rb.height}px`);
+  // name and Recap share a row
+  const nb = await page.locator("#klasemen s-table-row .pn").first().boundingBox();
+  assert.ok(Math.abs((nb.y + nb.height / 2) - (rb.y + rb.height / 2)) <= 6, `name y ${nb.y} recap y ${rb.y}`);
+  // Main (played/sched, e.g. "0/4") is not shown on phone
+  const shown = (n) => page.evaluate((n) => document.querySelector("#klasemen s-table-row").querySelectorAll("s-table-cell")[n].querySelector("span").getClientRects().length > 0, n);
+  assert.equal(await shown(1), false, "Main is hidden on phone");
+  assert.equal(await shown(4), false, "Game is hidden on phone");
+  assert.equal(await shown(2), true, "Menang is shown on phone");
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  await ctx.close();
+});
+
+test("iPad: wide table shows all 7 column headers incl. Recap", async () => {
+  const { page, ctx } = await klasemen({ width: 768, height: 1000 });
+  const heads = await page.locator("#klasemen s-table-header").evaluateAll((els) => els.map((e) => e.textContent.trim()));
+  assert.deepEqual(heads, ["Pemain", "Main", "Menang", "Kalah", "Game", "Selisih", "Recap"]);
+  for (const n of [1, 4]) {
+    assert.equal(await page.evaluate((n) => document.querySelector("#klasemen s-table-row").querySelectorAll("s-table-cell")[n].querySelector("span").getClientRects().length > 0, n), true, `column ${n} shown on iPad`);
+  }
+  assert.equal(await page.locator('#klasemen s-table-row [data-act="recap"]').first().getAttribute("variant"), "secondary");
+  await ctx.close();
+});
+
 test("no player chosen: CTA asks to pick a name", async () => {
   const { page, ctx } = await open({ me: null });
   await waitModal(page, true, 4000);

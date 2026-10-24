@@ -21,7 +21,21 @@ test("tabs are s-buttons and the selected one is primary", async () => {
   await page.click('[data-tab="klasemen"]');
   assert.equal(await page.locator('[data-tab="klasemen"]').getAttribute("variant"), "primary");
   assert.equal(await page.locator('[data-tab="jadwal"]').getAttribute("variant"), "secondary");
-  assert.equal(await page.locator('[data-tab="klasemen"]').getAttribute("aria-selected"), "true");
+  await ctx.close();
+});
+
+test("tabs: labelled nav, selection announced via accessibilityLabel (no broken tab roles)", async () => {
+  const { page, ctx } = await open();
+  assert.equal(await page.locator("nav.tabs").getAttribute("aria-label"), "Bagian halaman");
+  assert.equal(await page.evaluate(() => document.querySelectorAll('nav [role="tablist"], nav[role], [data-tab][role], [data-tab][aria-selected]').length), 0);
+  const label = (t) => page.locator(`[data-tab="${t}"] button`).getAttribute("aria-label");
+  assert.equal(await label("jadwal"), "Jadwal, dipilih");
+  assert.equal(await label("klasemen"), "Klasemen");
+  await page.click('[data-tab="klasemen"]');
+  await page.waitForTimeout(100);
+  assert.equal(await label("klasemen"), "Klasemen, dipilih");
+  assert.equal(await label("jadwal"), "Jadwal");
+  assert.equal(await label("pemain"), "Pemain");
   await ctx.close();
 });
 

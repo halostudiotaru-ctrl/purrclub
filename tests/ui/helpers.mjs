@@ -34,13 +34,15 @@ export async function teardown() {
   browser = server = base = null;
 }
 
-export async function open({ width = 390, height = 844, scheme = "light", me = 0, block = [] } = {}) {
+// routes: [[pattern, handler]] registered on the context before the page loads (e.g. to mock /api/*).
+export async function open({ width = 390, height = 844, scheme = "light", me = 0, block = [], routes = [] } = {}) {
   const { base, browser } = await setup();
   const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: scheme });
   if (me !== null) {
     await ctx.addInitScript((p) => localStorage.setItem("halloween-tennis-me-v1", JSON.stringify({ p, photo: null })), me);
   }
   for (const pat of block) await ctx.route(pat, (r) => r.abort());
+  for (const [pat, handler] of routes) await ctx.route(pat, handler);
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));

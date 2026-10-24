@@ -37,6 +37,13 @@ test("dark theme: Polaris tokens follow the dark palette", async () => {
   await ctx.close();
 });
 
+test("dark theme: neutral badge has a visible pill (surface2)", async () => {
+  const { page, ctx } = await open({ scheme: "dark" });
+  const bg = await page.evaluate(() => getComputedStyle(document.querySelector('s-badge[tone="neutral"]').shadowRoot.querySelector(".badge")).backgroundColor);
+  assert.equal(bg, "rgb(47, 31, 71)");
+  await ctx.close();
+});
+
 test("every theme token name exists in the live polaris.js", async () => {
   const html = fs.readFileSync(new URL("../../index.html", import.meta.url), "utf8");
   const names = [...new Set([...html.matchAll(/(--p-[a-z0-9-]+-f4125)\s*:/g)].map((m) => m[1]))];

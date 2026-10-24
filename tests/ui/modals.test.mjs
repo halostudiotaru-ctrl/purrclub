@@ -65,7 +65,7 @@ test("selfie step shows an avatar and stacked full-width actions", async () => {
   await waitModal(page, true, 4000);
   await page.click('[data-act="choose"][data-p="2"]');
   await waitModalText(page, "Selfie buat recap-mu");
-  assert.equal(await page.locator('s-modal s-avatar').count(), 1);
+  assert.equal(await page.locator("s-modal .big-av").count(), 1);
   for (const a of ["selfie", "gallery", "close"]) assert.equal(await page.locator(`s-modal [data-act="${a}"]`).count(), 1);
   await ctx.close();
 });
@@ -90,5 +90,51 @@ test("modal buttons are at least 44px tall", async () => {
     const box = await page.locator(`s-modal ${sel} button`).boundingBox();
     assert.ok(box.height >= 44 - 0.01, `${sel} ${box.height}px`);
   }
+  await ctx.close();
+});
+
+test("toast is above the open modal (top layer)", async () => {
+  const { page, ctx } = await open();
+  await page.click('[data-act="resetall"]');
+  await waitModal(page, true);
+  await page.click('[data-act="rstok"]');
+  await page.waitForFunction(() => document.getElementById("toast").textContent.includes("Ketik RESET dulu"));
+  await page.waitForTimeout(100);
+  const box = await page.locator("#toast").boundingBox();
+  assert.ok(box && box.width > 0, "toast is visible");
+  const hit = await page.evaluate(([x, y]) => {
+    const el = document.elementFromPoint(x, y), t = document.getElementById("toast");
+    return { onToast: !!el && (el === t || t.contains(el)), tag: el && el.tagName };
+  }, [box.x + box.width / 2, box.y + box.height / 2]);
+  assert.ok(hit.onToast, `elementFromPoint at the toast centre hit ${hit.tag}`);
+  await ctx.close();
+});
+
+test("profile modal shows a large (>= 100px) round photo/initial", async () => {
+  const { page, ctx } = await open({ me: 0 });
+  await page.click('[data-act="profile"]');
+  await waitModal(page, true);
+  await page.waitForTimeout(400);
+  const b = await page.locator("s-modal .big-av").boundingBox();
+  assert.ok(b && b.width >= 100, `big avatar width ${b && b.width}`);
+  assert.equal(Math.round(b.width), Math.round(b.height));
+  await ctx.close();
+});
+
+test("a malicious photo src from the server cannot inject attributes", async () => {
+  const evil = 'data:image/jpeg;base64,x" onerror="window.__xss=1';
+  const { page, ctx } = await open({
+    me: 0,
+    routes: [
+      ["**/api/state", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ rev: 1, matches: freshMatches(), photos: { 0: 1 } }) })],
+      ["**/api/photo?p=0", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ photo: evil }) })],
+    ],
+  });
+  await page.click('[data-tab="klasemen"]');
+  // the photo arrived and was rendered (chip avatar carries a src)
+  await page.waitForFunction(() => document.querySelector("#chip s-avatar[src]"), null, { timeout: 5000 });
+  await page.waitForTimeout(500);
+  assert.equal(await page.evaluate(() => window.__xss), undefined);
+  assert.equal(await page.evaluate(() => document.querySelectorAll("[onerror]").length), 0);
   await ctx.close();
 });
