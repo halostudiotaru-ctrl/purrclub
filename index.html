@@ -94,12 +94,17 @@ body{
   --p-color-button-bg-fill-f4125:var(--surface);
   --p-color-button-bg-fill-hover-f4125:var(--surface2);
   --p-color-button-bg-fill-active-f4125:var(--surface2);
-  --p-color-button-gradient-bg-fill-f4125:var(--surface);
+  /* gradient tokens are painted as a layer ON TOP of the fill: must stay transparent */
+  --p-color-button-gradient-bg-fill-f4125:none;
   --p-color-button-bg-fill-critical-f4125:var(--surface);
   --p-color-button-bg-fill-critical-hover-f4125:var(--tint-lose);
   --p-color-button-bg-fill-critical-active-f4125:var(--tint-lose);
-  --p-color-button-gradient-bg-fill-critical-f4125:var(--surface);
+  --p-color-button-gradient-bg-fill-critical-f4125:none;
   --p-color-text-critical-f4125:var(--lose);
+  /* button bevels: Polaris defaults are gray/white/black (white ring in dark mode) */
+  --p-shadow-button-f4125:inset 0 0 0 1px var(--line);
+  --p-shadow-button-primary-f4125:inset 0 0 0 1px var(--pumpkin);
+  --p-shadow-button-primary-critical-f4125:inset 0 0 0 1px var(--lose);
 
   /* inputs */
   --p-color-input-bg-surface-f4125:var(--bg);
@@ -120,6 +125,8 @@ body{
   --p-color-badge-bg-fill-info-f4125:var(--tint-live);
   --p-color-badge-text-info-f4125:var(--live);
   --p-color-bg-surface-info-f4125:var(--tint-live);
+  --p-color-bg-fill-info-f4125:var(--tint-live);
+  --p-color-text-info-on-bg-fill-f4125:var(--ink);
   --p-color-icon-info-accent-f4125:var(--live);
   --p-color-text-success-f4125:var(--win);
 
@@ -164,6 +171,8 @@ s-banner.gap{display:block;margin-bottom:16px}
   .kl-side{position:sticky;top:88px}
 }
 .topn{color:var(--pumpkin)}
+/* Polaris right-aligns numeric headers but not their cells; match them */
+.num{display:block;text-align:end;font-variant-numeric:tabular-nums}
 .pgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
 @media (min-width:700px){.pgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (min-width:1024px){.pgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -375,8 +384,8 @@ function selfieStep(){
   openModal("Selfie buat recap-mu",h);
 }
 function profileModal(){
-  var h='<s-stack alignItems="center" gap="base">'+avatar(me.p,120)+'</s-stack>';
-  h+='<s-stack gap="small">'+btn('variant="primary" inlineSize="fill" data-act="recap" data-p="'+me.p+'"','Lihat recap-ku')+btn('variant="secondary" inlineSize="fill" data-act="selfiestep"',me.photo?'Ganti foto':'Tambah selfie')+btn('variant="secondary" inlineSize="fill" data-act="pick"','Ganti pemain')+btn('variant="tertiary" inlineSize="fill" data-act="close"','Tutup')+'</s-stack>';
+  var h='<s-stack gap="base"><s-stack alignItems="center" gap="base">'+avatar(me.p,120)+'</s-stack>';
+  h+='<s-stack gap="small">'+btn('variant="primary" inlineSize="fill" data-act="recap" data-p="'+me.p+'"','Lihat recap-ku')+btn('variant="secondary" inlineSize="fill" data-act="selfiestep"',me.photo?'Ganti foto':'Tambah selfie')+btn('variant="secondary" inlineSize="fill" data-act="pick"','Ganti pemain')+btn('variant="tertiary" inlineSize="fill" data-act="close"','Tutup')+'</s-stack></s-stack>';
   openModal(PLAYERS[me.p],h);
 }
 function processFile(file){
@@ -508,7 +517,8 @@ function renderKlasemen(){
   s.forEach(function(r,idx){
     var d=r.gw-r.gl,top=(idx===0&&r.played>0);
     var name='<span'+(top?' class="topn"':'')+'><b>'+(idx+1)+'. '+esc(r.name)+'</b></span>'+(r.i===me.p?' <s-badge tone="info">kamu</s-badge>':'');
-    h+='<s-table-row><s-table-cell>'+name+'</s-table-cell><s-table-cell>'+r.played+'/'+r.sched+'</s-table-cell><s-table-cell>'+r.w+'</s-table-cell><s-table-cell>'+r.l+'</s-table-cell><s-table-cell>'+r.gw+'–'+r.gl+'</s-table-cell><s-table-cell>'+(d>0?'+':'')+d+'</s-table-cell><s-table-cell>'+btn('variant="tertiary" data-act="recap" data-p="'+r.i+'"','Recap')+'</s-table-cell></s-table-row>';
+    var num=function(v){return '<s-table-cell><span class="num">'+v+'</span></s-table-cell>'};
+    h+='<s-table-row><s-table-cell>'+name+'</s-table-cell>'+num(r.played+'/'+r.sched)+num(r.w)+num(r.l)+num(r.gw+'–'+r.gl)+num((d>0?'+':'')+d)+'<s-table-cell>'+btn('variant="tertiary" data-act="recap" data-p="'+r.i+'"','Recap')+'</s-table-cell></s-table-row>';
   });
   h+='</s-table-body></s-table></s-section><p class="note">Urutan: jumlah menang, lalu selisih game. Tiap pemain dijadwalkan sama: 4 match.</p></div></div>';
   $("klasemen").innerHTML=h;
