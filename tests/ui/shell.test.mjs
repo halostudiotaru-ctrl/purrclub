@@ -42,10 +42,17 @@ test("chip CTA is a primary s-button when no player is chosen", async () => {
 test("header controls are at least 44px tall", async () => {
   const { page, ctx } = await open();
   // s-button hosts are display:contents (no box), so measure the real <button> in their shadow root.
-for (const sel of ['[data-tab="jadwal"] button', "#chip s-clickable", '[data-act="resetall"] button']) {
+  for (const sel of ['[data-tab="jadwal"] button', '[data-tab="klasemen"] button', '[data-tab="pemain"] button', "#chip s-clickable", '[data-act="resetall"] button']) {
     const box = await page.locator(sel).first().boundingBox();
-    assert.ok(box.height >= 43.5, `${sel} is ${box.height}px tall`);
+    assert.ok(box.height >= 44 - 0.01, `${sel} is ${box.height}px tall`);
   }
+  await ctx.close();
+});
+
+test("pick CTA is at least 44px tall", async () => {
+  const { page, ctx } = await open({ me: null });
+  const box = await page.locator('#chip s-button[data-act="pick"] button').boundingBox();
+  assert.ok(box.height >= 44 - 0.01, `pick CTA is ${box.height}px tall`);
   await ctx.close();
 });
 
