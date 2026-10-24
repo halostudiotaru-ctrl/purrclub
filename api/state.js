@@ -60,6 +60,7 @@ function apply(st, b) {
     const ids = b.a.concat(b.b).map(num);
     if (!ids.every(p => isPlayer(st, p))) throw err(400, "Pemain tidak valid");
     if (new Set(ids).size !== 4) throw err(400, "Empat pemain harus berbeda");
+    if (ms.length >= 40) throw err(409, "Jumlah match sudah penuh");
     ms.push(S.fresh({ a: ids.slice(0, 2), b: ids.slice(2), manual: true }));
     return;
   }
@@ -117,6 +118,12 @@ module.exports = async (req, res) => {
         st.rev = Date.now();
         await cmd(["SET", "ht:state", JSON.stringify(st)]);
         if (b.op === "resetall") await dropExtraPhotos();
+        if (b.op === "addplayer") {
+          // the index may be reused after a reset: never inherit an old selfie
+          const idx = st.players.length - 1;
+          await cmd(["DEL", "ht:photo:" + idx]);
+          await cmd(["HDEL", "ht:photov", String(idx)]);
+        }
         return st;
       });
       return res.status(200).json(publicState(out));

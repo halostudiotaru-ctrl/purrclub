@@ -80,3 +80,21 @@ test("game modal can add a new player inline and keeps the picks", async () => {
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+test("a player name with HTML is rendered as text, never injected", async () => {
+  const { page, ctx, errors } = await open({ routes: fakeApi() });
+  await waitLive(page);
+  const evil = "<img src=x onerr=1>"; // 19 chars (maxlength is 20);
+  await page.click('[data-act="addplayer"]');
+  await waitModal(page, true);
+  await page.fill("s-text-field#npIn input", evil);
+  await page.click('[data-act="npok"]');
+  await waitModal(page, false);
+  await page.waitForFunction((n) => [...document.querySelectorAll("#pemain s-section")].some((e) => e.getAttribute("heading") === n), evil);
+  await page.click('[data-tab="klasemen"]');
+  assert.equal(await page.locator("#klasemen s-table-row", { hasText: evil }).count(), 1);
+  assert.equal(await page.locator('img[src="x"]').count(), 0);
+  assert.equal(await page.evaluate(() => window.__xss), undefined);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});

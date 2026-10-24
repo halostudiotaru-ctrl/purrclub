@@ -246,7 +246,7 @@ var PLAYERS=DEFAULT_PLAYERS.slice();
 var DEFAULT_M=10,KEY="halloween-tennis-v3",MEKEY="halloween-tennis-me-v1";
 var BASE="https://claude.ai/artifact/UFPGpWiytzJERZ9XPK2Xsf";
 var FIXED=[1,2,9,7,0,8,6,3,7,2,4,5,1,6,3,9,0,5,8,4,7,3,9,6,2,5,0,1,7,4,8,9,6,0,5,1,8,3,4,2];
-var state=null,me={p:null,photo:null},photos={},photoVer={},pending=null,recapBlob=null,recapName="recap.png",toastT=null;
+var state=null,me={p:null,photo:null,name:null},photos={},photoVer={},pending=null,recapBlob=null,recapName="recap.png",toastT=null;
 var rev=0,inflight=0,online=null,uploadingFor=null;
 
 /* ---------- util ---------- */
@@ -287,7 +287,7 @@ function matchLabel(m,i){return m.manual?"Game manual":slotTime(i)}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 function load(){try{var r=localStorage.getItem(KEY);if(r){var s=JSON.parse(r);if(s&&s.matches&&s.matches.length>=1){if(!Array.isArray(s.players))s.players=DEFAULT_PLAYERS.slice();return s}}}catch(e){}return null}
 function saveMe(){try{localStorage.setItem(MEKEY,JSON.stringify(me))}catch(e){}}
-function loadMe(){try{var r=localStorage.getItem(MEKEY);if(r){var o=JSON.parse(r);if(o&&typeof o==="object")return {p:(typeof o.p==="number"?o.p:null),photo:o.photo||null}}}catch(e){}return {p:null,photo:null}}
+function loadMe(){try{var r=localStorage.getItem(MEKEY);if(r){var o=JSON.parse(r);if(o&&typeof o==="object")return {p:(typeof o.p==="number"?o.p:null),photo:o.photo||null,name:(typeof o.name==="string"?o.name:null)}}}catch(e){}return {p:null,photo:null,name:null}}
 
 /* ---------- sinkron (Vercel API) ---------- */
 function api(path,opt){
@@ -296,7 +296,12 @@ function api(path,opt){
   });
 }
 function setOnline(v){if(online===v)return;online=v;var e=$("sync");if(e)e.textContent=v===null?"":(v?"● Live":"● Offline, coba lagi otomatis")}
-function fixMe(){if(me.p!==null&&me.p>=PLAYERS.length){me.p=null;me.photo=null;saveMe()}}
+function fixMe(){
+  if(me.p===null)return false;
+  if(me.p>=PLAYERS.length||(me.name&&PLAYERS[me.p]!==me.name)){me.p=null;me.photo=null;me.name=null;saveMe();return true}
+  if(!me.name){me.name=PLAYERS[me.p];saveMe()}
+  return false;
+}
 function adopt(r){
   state.cur=typeof r.cur==="number"?r.cur:null;
   if(Array.isArray(r.players))state.players=r.players;
@@ -305,7 +310,7 @@ function adopt(r){
     var old=state.matches[i]||{};
     return {a:m.a||old.a||[0,1],b:m.b||old.b||[2,3],manual:!!m.manual,games:m.games,p:m.p,adv:m.adv,deuceN:m.deuceN,sudden:m.sudden,done:m.done,hn:m.hn||0};
   });
-  fixMe();
+  if(fixMe()&&!modalIsOpen())pickPlayer();
   try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
 }
 function sendOp(body){
@@ -332,6 +337,13 @@ function pull(force){
         jobs.push(api("/api/photo?p="+p).then(function(r){if(r.photo){photos[p]=r.photo;changed=true}}).catch(function(){photoVer[p]=null}));
       }
     });
+    if(s.photos){
+      Object.keys(photos).forEach(function(k){
+        var p=+k;
+        if(s.photos[k]!==undefined||(p===me.p&&me.photo))return;
+        delete photos[p];delete photoVer[p];changed=true;
+      });
+    }
     return Promise.all(jobs).then(function(){
       if(me.p!==null&&me.photo&&!(s.photos&&s.photos[me.p]))uploadPhoto(me.p,me.photo);
       if(changed)render();
@@ -346,7 +358,7 @@ function uploadPhoto(p,data){
     .then(function(){uploadingFor=null});
 }
 function resetAllModal(){
-  openModal("Hapus semua skor?",'<s-paragraph>Ini menghapus skor semua match untuk semua orang. Ketik RESET untuk lanjut.</s-paragraph><s-text-field id="rstIn" label="Ketik RESET" placeholder="RESET" autocomplete="off"></s-text-field>',
+  openModal("Hapus semua skor?",'<s-paragraph>Ini menghapus semua skor, pemain manual, game manual, dan penggantian pemain, untuk semua orang. Ketik RESET untuk lanjut.</s-paragraph><s-text-field id="rstIn" label="Ketik RESET" placeholder="RESET" autocomplete="off"></s-text-field>',
     {secondary:{act:"close",label:"Batal"},primary:{act:"rstok",label:"Hapus skor",critical:true}});
 }
 
@@ -492,7 +504,7 @@ function selfieStep(){
 }
 function profileModal(){
   var h='<s-stack gap="base"><s-stack alignItems="center" gap="base">'+avatar(me.p,120)+'</s-stack>';
-  h+='<s-stack gap="small">'+btn('variant="primary" inlineSize="fill" data-act="recap" data-p="'+me.p+'"','Lihat recap-ku')+btn('variant="secondary" inlineSize="fill" data-act="selfiestep"',me.photo?'Ganti foto':'Tambah selfie')+btn('variant="secondary" inlineSize="fill" data-act="pick"','Ganti pemain')+btn('variant="tertiary" inlineSize="fill" data-act="close"','Tutup')+'</s-stack></s-stack>';
+  h+='<s-stack gap="small">'+btn('variant="primary" inlineSize="fill" data-act="recap" data-p="'+me.p+'"','Lihat recap-ku')+btn('variant="secondary" inlineSize="fill" data-act="selfiestep"',me.photo?'Ganti foto':'Tambah selfie')+btn('variant="secondary" inlineSize="fill" data-act="pick"','Bukan aku')+btn('variant="tertiary" inlineSize="fill" data-act="close"','Tutup')+'</s-stack></s-stack>';
   openModal(PLAYERS[me.p],h);
 }
 function processFile(file){
@@ -744,7 +756,7 @@ document.addEventListener("click",function(e){
     var idx=+t.dataset.reset;
     confirmBox("Reset skor Match "+(idx+1)+"?","Reset match").then(function(ok){
       if(!ok||!canAct(idx))return;
-      sendOp({op:"resetmatch",i:idx,p:me.p}).then(function(){toast("Match "+(idx+1)+" direset")});
+      sendOp({op:"resetmatch",i:idx,p:me.p}).then(function(ok){if(ok)toast("Match "+(idx+1)+" direset")});
     });
     return;
   }
@@ -762,7 +774,7 @@ document.addEventListener("click",function(e){
   else if(a==="rstok"){
     var v=(($("rstIn")||{}).value||"").trim().toUpperCase();
     if(v!=="RESET"){toast("Ketik RESET dulu");return}
-    closeModal();sendOp({op:"resetall",confirm:"RESET"}).then(function(){toast("Semua skor dihapus")});
+    closeModal();sendOp({op:"resetall",confirm:"RESET"}).then(function(ok){if(ok)toast("Semua skor dihapus")});
   }
   else if(a==="subpick"&&subCtx){subCtx.side=+t.dataset.side;subCtx.slot=+t.dataset.slot;subToModal()}
   else if(a==="subto"&&subCtx){
@@ -795,7 +807,7 @@ document.addEventListener("click",function(e){
     sendOp({op:"addmatch",a:[gs[0],gs[1]],b:[gs[2],gs[3]]}).then(function(ok){if(ok)toast("Game manual ditambahkan")});
   }
   else if(a==="pick"){pickPlayer()}
-  else if(a==="choose"){var np=+t.dataset.p;if(np!==me.p)me.photo=null;me.p=np;saveMe();render();selfieStep()}
+  else if(a==="choose"){var np=+t.dataset.p;if(np!==me.p)me.photo=null;me.p=np;me.name=PLAYERS[np];saveMe();render();selfieStep()}
   else if(a==="profile"){profileModal()}
   else if(a==="selfiestep"){selfieStep()}
   else if(a==="selfie"){$("selfieIn").value="";$("selfieIn").click()}

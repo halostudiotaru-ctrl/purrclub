@@ -144,3 +144,21 @@ test("photo api accepts indexes below MAX_PLAYERS only", async () => {
   assert.equal((await call(photoHandler, { method: "GET", query: { p: "15" } })).status, 200);
   assert.equal((await call(photoHandler, { method: "GET", query: { p: String(S.MAX_PLAYERS) } })).status, 400);
 });
+
+test("addplayer drops a stale photo left on the reused index", async () => {
+  kv.set("ht:photo:10", "stale"); hashOf("ht:photov").set("10", "1");
+  kv.set("ht:photo:3", "y"); hashOf("ht:photov").set("3", "1");
+  const r = await post({ op: "addplayer", name: "Tamu" });
+  assert.equal(r.status, 200);
+  assert.equal(kv.has("ht:photo:10"), false);
+  assert.equal(hashOf("ht:photov").has("10"), false);
+  assert.equal(kv.get("ht:photo:3"), "y");
+  assert.equal(hashOf("ht:photov").get("3"), "1");
+});
+
+test("addmatch is capped at 40 matches", async () => {
+  for (let k = 0; k < 30; k++) assert.equal((await post({ op: "addmatch", a: [0, 1], b: [2, 3] })).status, 200);
+  const r = await post({ op: "addmatch", a: [0, 1], b: [2, 3] });
+  assert.equal(r.status, 409);
+  assert.equal((await get()).body.matches.length, 40);
+});
