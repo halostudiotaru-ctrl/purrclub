@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Halloween Tennis – Medco Ampera</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Eater&family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f6efe0; --surface:#fffaf0; --surface2:#efe3cb; --ink:#241733; --muted:#6b5a78;
+  --pumpkin:#d9560b; --pumpkin-ink:#ffffff; --line:#d9c9a8; --win:#2f7d4f; --lose:#a8324a; --live:#6a3fb5;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#160e22; --surface:#231636; --surface2:#2f1f47; --ink:#f3ead8; --muted:#a898bd;
+    --pumpkin:#ff8a1f; --pumpkin-ink:#241733; --line:#3d2b58; --win:#7ed6a0; --lose:#ff8aa0; --live:#b99cff;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#160e22; --surface:#231636; --surface2:#2f1f47; --ink:#f3ead8; --muted:#a898bd;
+  --pumpkin:#ff8a1f; --pumpkin-ink:#241733; --line:#3d2b58; --win:#7ed6a0; --lose:#ff8aa0; --live:#b99cff;
+  color-scheme:dark;
+}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Barlow',system-ui,sans-serif;font-size:16px;line-height:1.45;min-height:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+.wrap{max-width:640px;margin:0 auto;padding:0 14px 40px}
+header{padding:22px 0 12px}
+h1{font-family:'Eater','Barlow Condensed',cursive;font-weight:400;font-size:clamp(36px,11vw,56px);line-height:1;margin:0;color:var(--pumpkin);letter-spacing:.5px}
+.sub{margin:8px 0 0;color:var(--muted);font-size:14.5px}
+.sub a{color:var(--ink)}
+.rules{margin:14px 0 0;padding:12px 14px;background:var(--surface2);border-radius:10px;font-size:14px;color:var(--ink)}
+.rules b{font-weight:600}
+#chip{margin-top:12px}
+.chip{display:inline-flex;align-items:center;gap:10px;padding:6px 14px 6px 6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;font:600 15px 'Barlow',sans-serif;cursor:pointer}
+.chip.cta{padding:10px 16px;background:var(--pumpkin);color:var(--pumpkin-ink);border-color:var(--pumpkin)}
+.av{border-radius:50%;object-fit:cover;background:var(--pumpkin);color:var(--pumpkin-ink);display:inline-flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;flex:none}
+nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;gap:6px;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line)}
+nav button{flex:1;padding:10px 6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;font:600 15px 'Barlow',sans-serif;cursor:pointer}
+nav button[aria-selected="true"]{background:var(--pumpkin);color:var(--pumpkin-ink);border-color:var(--pumpkin)}
+button:focus-visible{outline:3px solid var(--live);outline-offset:2px}
+section{display:none;padding-top:14px}
+section.on{display:block}
+.banner{background:var(--surface2);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px}
+.banner button{margin-top:8px;display:block}
+.match{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.match.live{border:2px solid var(--live)}
+.match.done{opacity:.92}
+.mh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
+.mh .t{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px}
+.mh .tag{font-size:13px;color:var(--muted)}
+.tag.liveTag{color:var(--live);font-weight:600}
+.teams{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}
+.team{padding:8px 4px;text-align:center}
+.team .n{font-weight:600;font-size:17px;line-height:1.25}
+.team.w .n{color:var(--win)}
+.me-n{text-decoration:underline;text-decoration-color:var(--pumpkin);text-underline-offset:3px}
+.vs{color:var(--muted);font-size:13px}
+.scoreRow{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin:6px 0 2px}
+.games{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:54px;line-height:1;text-align:center}
+.mid{text-align:center;color:var(--muted);font-size:13px}
+.pt{text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:26px;color:var(--muted)}
+.pt.big{color:var(--ink)}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.btns button{padding:14px 8px;border-radius:10px;border:0;background:var(--pumpkin);color:var(--pumpkin-ink);font:700 16px 'Barlow',sans-serif;cursor:pointer;min-height:52px}
+.btns button:active{transform:scale(.98)}
+.state{text-align:center;margin-top:8px;font-weight:600;color:var(--live);min-height:22px}
+.mini{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+button.sm,.mini button{padding:8px 12px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:8px;font:500 14px 'Barlow',sans-serif;cursor:pointer}
+.rest{margin-top:10px;font-size:13.5px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{padding:9px 6px;text-align:center;border-bottom:1px solid var(--line)}
+th{font-weight:600;color:var(--muted);font-size:13px}
+td:first-child,th:first-child{text-align:left}
+td.name{font-weight:600}
+tr.top td.name{color:var(--pumpkin)}
+tr.mine td{background:var(--surface2)}
+td button.sm{padding:6px 10px;font-size:13px;border-color:var(--pumpkin);color:var(--pumpkin)}
+.tblWrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px 8px}
+.note{font-size:13.5px;color:var(--muted);margin:10px 2px}
+.recapCta{display:flex;align-items:center;gap:14px;background:var(--surface);border:2px solid var(--pumpkin);border-radius:14px;padding:14px;margin-bottom:12px}
+.recapCta h3{margin:0;font-family:'Barlow Condensed',sans-serif;font-size:22px}
+.recapCta p{margin:2px 0 8px;font-size:14px;color:var(--muted)}
+.pri{padding:11px 16px;border-radius:10px;border:0;background:var(--pumpkin);color:var(--pumpkin-ink);font:700 15px 'Barlow',sans-serif;cursor:pointer}
+.ghost{padding:11px 16px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);font:600 15px 'Barlow',sans-serif;cursor:pointer}
+.danger{padding:11px 16px;border-radius:10px;border:0;background:var(--lose);color:#fff;font:700 15px 'Barlow',sans-serif;cursor:pointer}
+.pcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.pcard h3{margin:0 0 6px;font-family:'Barlow Condensed',sans-serif;font-size:21px}
+.pcard p{margin:3px 0;font-size:14.5px}
+.pcard .k{color:var(--muted)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.tools button{padding:10px 14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;font:500 14px 'Barlow',sans-serif;cursor:pointer}
+.tools button.dg{color:var(--lose)}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(12,6,22,.62);display:none;align-items:flex-end;justify-content:center;z-index:50}
+.ov.on{display:flex}
+.sheet{background:var(--surface);color:var(--ink);width:100%;max-width:640px;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));max-height:94%;overflow:auto}
+.sheet h3{margin:0 0 10px;font-family:'Barlow Condensed',sans-serif;font-size:24px}
+.mtxt{margin:0 0 14px}
+.mrow{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px}
+.mrow.col{flex-direction:column}
+.mrow.col button{width:100%}
+.pick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pick button{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;font:600 16px 'Barlow',sans-serif;cursor:pointer;text-align:left}
+.pick button.sel{border-color:var(--pumpkin);background:var(--surface2)}
+.center{text-align:center}
+.rbox{display:flex;justify-content:center}
+.rbox img{max-height:58vh;max-width:100%;width:auto;border-radius:12px;border:1px solid var(--line)}
+.linkbox{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:14px 'Barlow',sans-serif}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;z-index:60;display:none;max-width:90%;text-align:center}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Halloween Tennis</h1>
+  <p class="sub">Sabtu, 24 Okt · 17:00–22:00 · <a href="https://maps.app.goo.gl/8W14SVu49JueAfwQA?g_st=ic" target="_blank" rel="noopener">Medco Ampera</a></p>
+  <div id="chip"></div>
+  <div class="rules">
+    <b>Aturan:</b> doubles, partner berganti tiap match. Satu match sampai <b>4 game</b>. Setiap game: 15–30–40, <b>deuce hanya 1 kali</b>, deuce kedua jadi <b>sudden death</b> (poin berikutnya menang). 10 match × 30 menit di 1 lapangan, tiap orang main <b>4 kali</b>.
+  </div>
+</header>
+
+<nav role="tablist">
+  <button role="tab" aria-selected="true" data-tab="jadwal">Jadwal</button>
+  <button role="tab" aria-selected="false" data-tab="klasemen">Klasemen</button>
+  <button role="tab" aria-selected="false" data-tab="pemain">Pemain</button>
+</nav>
+
+<section id="jadwal" class="on"></section>
+<section id="klasemen"></section>
+<section id="pemain"></section>
+
+<div class="tools" id="tools">
+  <button class="dg" data-act="resetall">Hapus semua skor</button>
+</div>
+</div>
+
+<div class="ov" id="ov"></div>
+<div id="toast" role="status"></div>
+<input type="file" id="selfieIn" accept="image/*" capture="user" hidden>
+<input type="file" id="galleryIn" accept="image/*" hidden>
+
+<script>
+(function(){
+var PLAYERS=["Angel","Faiz","Bella","Fai","Dian","Aryo","Aya","Rini","Norman","Fran"];
+var N=10,M=10,KEY="halloween-tennis-v3",MEKEY="halloween-tennis-me-v1";
+var BASE="https://claude.ai/artifact/UFPGpWiytzJERZ9XPK2Xsf";
+var FIXED=[1,2,9,7,0,8,6,3,7,2,4,5,1,6,3,9,0,5,8,4,7,3,9,6,2,5,0,1,7,4,8,9,6,0,5,1,8,3,4,2];
+var state=null,me={p:null,photo:null},photos={},photoVer={},pending=null,recapBlob=null,recapName="recap.png",toastT=null;
+var rev=0,inflight=0,online=null,uploadingFor=null;
+
+/* ---------- util ---------- */
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function $(id){return document.getElementById(id)}
+function toast(t){var e=$("toast");e.textContent=t;e.style.display="block";clearTimeout(toastT);toastT=setTimeout(function(){e.style.display="none"},2800)}
+function slotTime(i){var mins=17*60+i*30;function f(x){var h=Math.floor(x/60),mi=x%60;return (h<10?"0":"")+h+":"+(mi<10?"0":"")+mi}return f(mins)+"–"+f(mins+30)}
+function freshMatch(f){return {a:[f[0],f[1]],b:[f[2],f[3]],games:[0,0],p:[0,0],adv:null,deuceN:0,sudden:false,done:false,hn:0}}
+function fixedSchedule(){var ms=[];for(var m=0;m<M;m++)ms.push(freshMatch(FIXED.slice(m*4,m*4+4)));return {matches:ms}}
+
+/* ---------- penyimpanan ---------- */
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+function load(){try{var r=localStorage.getItem(KEY);if(r){var s=JSON.parse(r);if(s&&s.matches&&s.matches.length===M)return s}}catch(e){}return null}
+function saveMe(){try{localStorage.setItem(MEKEY,JSON.stringify(me))}catch(e){}}
+function loadMe(){try{var r=localStorage.getItem(MEKEY);if(r){var o=JSON.parse(r);if(o&&typeof o==="object")return {p:(typeof o.p==="number"?o.p:null),photo:o.photo||null}}}catch(e){}return {p:null,photo:null}}
+
+/* ---------- sinkron (Vercel API) ---------- */
+function api(path,opt){
+  return fetch(path,opt).then(function(r){
+    return r.json().catch(function(){return {}}).then(function(j){if(!r.ok){var e=new Error(j.error||("HTTP "+r.status));e.status=r.status;throw e}return j});
+  });
+}
+function setOnline(v){if(online===v)return;online=v;var e=$("sync");if(e)e.textContent=v===null?"":(v?"● Live":"● Offline, coba lagi otomatis")}
+function adopt(remote){
+  for(var i=0;i<M;i++){var r=remote[i],m=state.matches[i];m.games=r.games;m.p=r.p;m.adv=r.adv;m.deuceN=r.deuceN;m.sudden=r.sudden;m.done=r.done;m.hn=r.hn||0}
+  try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+}
+function sendOp(body){
+  inflight++;
+  return api("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+    .then(function(r){setOnline(true);inflight--;if(inflight===0){adopt(r.matches);rev=r.rev;render()}})
+    .catch(function(e){
+      inflight--;
+      if(e.status&&e.status<500){toast(e.message)}else{setOnline(false);toast("Gagal kirim skor, cek koneksi")}
+      pull(true);
+    });
+}
+function pull(force){
+  return api("/api/state").then(function(s){
+    setOnline(true);
+    var changed=false;
+    if(s.matches&&(inflight===0||force)&&s.rev!==rev){adopt(s.matches);rev=s.rev;changed=true}
+    var jobs=[];
+    Object.keys(s.photos||{}).forEach(function(k){
+      var p=+k;
+      if(photoVer[p]!==s.photos[k]){
+        photoVer[p]=s.photos[k];
+        jobs.push(api("/api/photo?p="+p).then(function(r){if(r.photo){photos[p]=r.photo;changed=true}}).catch(function(){photoVer[p]=null}));
+      }
+    });
+    return Promise.all(jobs).then(function(){
+      if(me.p!==null&&me.photo&&!(s.photos&&s.photos[me.p]))uploadPhoto(me.p,me.photo);
+      if(changed)render();
+    });
+  }).catch(function(){setOnline(false)});
+}
+function uploadPhoto(p,data){
+  if(uploadingFor===p)return;uploadingFor=p;
+  return api("/api/photo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({p:p,photo:data})})
+    .then(function(r){photoVer[p]=r.v;toast("Foto terkirim ke semua orang")})
+    .catch(function(){toast("Foto tersimpan di HP, belum terkirim")})
+    .then(function(){uploadingFor=null});
+}
+function resetAllModal(){
+  openModal('<h3>Hapus semua skor?</h3><p class="mtxt">Ini menghapus skor semua match untuk semua orang. Ketik RESET untuk lanjut.</p><input class="linkbox" id="rstIn" autocomplete="off" autocapitalize="characters" placeholder="RESET"><div class="mrow"><button class="ghost" data-act="close">Batal</button><button class="danger" data-act="rstok">Hapus skor</button></div>');
+}
+
+/* ---------- logika skor ---------- */
+function winGame(m,s){m.games[s]++;m.p=[0,0];m.adv=null;m.deuceN=0;m.sudden=false;if(m.games[s]>=4)m.done=true}
+function applyPoint(m,s){
+  if(m.sudden){winGame(m,s)}
+  else if(m.adv!==null){
+    if(m.adv===s)winGame(m,s);
+    else{m.adv=null;m.deuceN++;if(m.deuceN>=2)m.sudden=true}
+  }
+  else if(m.p[0]===3&&m.p[1]===3){m.adv=s}
+  else{
+    m.p[s]++;
+    if(m.p[s]>=4)winGame(m,s);
+    else if(m.p[0]===3&&m.p[1]===3)m.deuceN=1;
+  }
+}
+function curIdx(){var i=firstOpen();return i<0?M:i}
+function inMatch(i,p){var m=state.matches[i];return p!==null&&m.a.concat(m.b).indexOf(p)>=0}
+function canScore(i){return i===curIdx()&&!state.matches[i].done}
+function canAct(i){var c=curIdx();return i===c||i===c-1}
+function addPoint(i,s){
+  if(!canScore(i))return;
+  var m=state.matches[i];
+  applyPoint(m,s);m.hn=Math.min(40,(m.hn||0)+1);
+  try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+  render();
+  sendOp({op:"point",i:i,s:s,p:me.p});
+}
+function undo(i){if(!canAct(i))return;sendOp({op:"undo",i:i,p:me.p})}
+function teamName(m,s){var t=s===0?m.a:m.b;return t.map(function(x){return PLAYERS[x]}).join(" & ")}
+var PTS=["0","15","30","40"];
+function pointText(m){
+  if(m.done)return "";
+  if(m.sudden)return "Sudden death";
+  if(m.adv!==null)return "Adv "+teamName(m,m.adv);
+  if(m.p[0]===3&&m.p[1]===3)return "Deuce";
+  return "";
+}
+
+/* ---------- modal ---------- */
+function openModal(html){var ov=$("ov");ov.innerHTML='<div class="sheet" role="dialog" aria-modal="true">'+html+'</div>';ov.classList.add("on")}
+function closeModal(){var ov=$("ov");ov.classList.remove("on");ov.innerHTML="";if(pending){var p=pending;pending=null;p(false)}}
+function confirmBox(msg,okLabel){
+  return new Promise(function(res){
+    pending=res;
+    openModal('<p class="mtxt">'+esc(msg)+'</p><div class="mrow"><button class="ghost" data-act="no">Batal</button><button class="danger" data-act="ok">'+esc(okLabel)+'</button></div>');
+  });
+}
+function answerConfirm(v){var p=pending;pending=null;var ov=$("ov");ov.classList.remove("on");ov.innerHTML="";if(p)p(v)}
+
+/* ---------- avatar & profil ---------- */
+function avatar(p,size){
+  var st='width:'+size+'px;height:'+size+'px;font-size:'+Math.round(size*0.55)+'px';
+  if(photos[p])return '<img class="av" style="'+st+'" alt="Foto '+esc(PLAYERS[p])+'" src="'+photos[p]+'">';
+  return '<span class="av" style="'+st+'">'+esc(PLAYERS[p].charAt(0))+'</span>';
+}
+function renderChip(){
+  var h;
+  if(me.p===null)h='<button class="chip cta" data-act="pick">Pilih namamu</button>';
+  else h='<button class="chip" data-act="profile">'+avatar(me.p,34)+'<span>Kamu: '+esc(PLAYERS[me.p])+'</span></button>';
+  h+='<span id="sync" class="note" style="margin-left:10px"></span>';
+  $("chip").innerHTML=h;
+  var se=$("sync");if(se&&online!==null)se.textContent=online?"● Live":"● Offline, coba lagi otomatis";
+}
+function pickPlayer(){
+  var h='<h3>Kamu yang mana?</h3><div class="pick">';
+  PLAYERS.forEach(function(n,i){h+='<button data-act="choose" data-p="'+i+'"'+(i===me.p?' class="sel"':'')+'>'+avatar(i,32)+'<span>'+esc(n)+'</span></button>'});
+  h+='</div><div class="mrow"><button class="ghost" data-act="close">Nanti saja</button></div>';
+  openModal(h);
+}
+function selfieStep(){
+  var h='<h3>Selfie buat recap-mu</h3><div class="center">'+avatar(me.p,140)+'</div>';
+  h+='<p class="note center">Foto dipakai di kartu recap dan tersimpan di HP ini saja.</p><div class="mrow col"><button class="pri" data-act="selfie">'+(me.photo?'Ambil ulang selfie':'Ambil selfie')+'</button><button class="ghost" data-act="gallery">Pilih dari galeri</button><button class="ghost" data-act="close">'+(me.photo?'Selesai':'Lewati')+'</button></div>';
+  openModal(h);
+}
+function profileModal(){
+  var h='<h3>'+esc(PLAYERS[me.p])+'</h3><div class="center">'+avatar(me.p,120)+'</div><div class="mrow col"><button class="pri" data-act="recap" data-p="'+me.p+'">Lihat recap-ku</button><button class="ghost" data-act="selfiestep">'+(me.photo?'Ganti foto':'Tambah selfie')+'</button><button class="ghost" data-act="pick">Ganti pemain</button><button class="ghost" data-act="close">Tutup</button></div>';
+  openModal(h);
+}
+function processFile(file){
+  if(!file)return;
+  var url=URL.createObjectURL(file),img=new Image();
+  img.onload=function(){
+    try{
+      var S=480,c=document.createElement("canvas");c.width=S;c.height=S;var x=c.getContext("2d");
+      var w=img.naturalWidth,h=img.naturalHeight,s=Math.min(w,h),sx=(w-s)/2,sy=(h-s)/2;
+      x.drawImage(img,sx,sy,s,s,0,0,S,S);
+      me.photo=c.toDataURL("image/jpeg",0.8);photos[me.p]=me.photo;saveMe();uploadingFor=null;uploadPhoto(me.p,me.photo);
+    }catch(e){toast("Foto gagal diproses, coba lagi")}
+    URL.revokeObjectURL(url);renderChip();selfieStep();render();
+  };
+  img.onerror=function(){URL.revokeObjectURL(url);toast("Foto tidak bisa dibuka")};
+  img.src=url;
+}
+
+/* ---------- statistik ---------- */
+function stats(){
+  var s=PLAYERS.map(function(n,i){return {i:i,name:n,played:0,w:0,l:0,gw:0,gl:0,sched:0}});
+  state.matches.forEach(function(m){
+    m.a.concat(m.b).forEach(function(p){s[p].sched++});
+    if(!m.done)return;
+    [0,1].forEach(function(side){
+      var team=side===0?m.a:m.b,won=m.games[side]>m.games[1-side];
+      team.forEach(function(p){
+        s[p].played++;s[p].gw+=m.games[side];s[p].gl+=m.games[1-side];
+        if(won)s[p].w++;else s[p].l++;
+      });
+    });
+  });
+  return s;
+}
+function ranked(){return stats().sort(function(a,b){return b.w-a.w||(b.gw-b.gl)-(a.gw-a.gl)||b.gw-a.gw||a.name.localeCompare(b.name)})}
+function recapData(p){
+  var r=ranked(),rank=0,row=null;
+  r.forEach(function(x,i){if(x.i===p){rank=i+1;row=x}});
+  var d={p:p,played:row.played,w:row.w,l:row.l,gw:row.gw,gl:row.gl,rank:rank,list:[],shut:0,skunk:0,closeW:0,closeL:0};
+  state.matches.forEach(function(m,i){
+    if(!m.done)return;
+    var side=m.a.indexOf(p)>=0?0:(m.b.indexOf(p)>=0?1:-1);if(side<0)return;
+    var mine=m.games[side],th=m.games[1-side],team=side===0?m.a:m.b,opp=side===0?m.b:m.a,won=mine>th;
+    var partner=team[0]===p?team[1]:team[0];
+    if(won&&th===0)d.shut++;
+    if(!won&&mine===0)d.skunk++;
+    if(mine-th===1)d.closeW++;
+    if(th-mine===1)d.closeL++;
+    d.list.push({i:i,partner:partner,opp:opp,mine:mine,th:th,won:won,margin:mine-th});
+  });
+  var byBest=d.list.slice().sort(function(a,b){return (b.won-a.won)||(b.margin-a.margin)||(b.mine-a.mine)||(a.i-b.i)});
+  d.duo=byBest[0]||null;
+  var byClose=d.list.slice().sort(function(a,b){return Math.abs(a.margin)-Math.abs(b.margin)||(a.i-b.i)});
+  d.close=byClose[0]||null;
+  d.diff=d.gw-d.gl;
+  d.title=titleFor(d);
+  return d;
+}
+function titleFor(d){
+  if(!d.played)return "Belum main";
+  if(d.w===d.played)return "Tak Terkalahkan";
+  if(d.closeW>=2)return "Raja Clutch";
+  if(d.shut>=1)return "Si Tembok";
+  if(d.diff>=5)return "Mesin Game";
+  if(d.w===0)return "Arwah Penasaran";
+  if(d.closeL>=2)return "Hampir Banget";
+  if(d.diff>=1)return "Pemain Solid";
+  return "Penyeimbang Dunia Lain";
+}
+
+/* ---------- tampilan ---------- */
+function banner(){
+  var c=firstOpen();
+  if(c<0)return '';
+  return '<div class="banner"><b>Match '+(c+1)+' sedang main.</b> Siapa saja bisa mencatat poin di kartu bertanda biru. Skor tampil live di semua HP.</div>';
+}
+function firstOpen(){for(var i=0;i<M;i++)if(!state.matches[i].done)return i;return -1}
+function nm(p){return p===me.p?'<span class="me-n">'+esc(PLAYERS[p])+'</span>':esc(PLAYERS[p])}
+
+function renderJadwal(){
+  var cur=firstOpen(),h=banner();
+  state.matches.forEach(function(m,i){
+    var inMatch=m.a.concat(m.b);
+    var rest=PLAYERS.map(function(_,k){return k}).filter(function(k){return inMatch.indexOf(k)<0});
+    var live=(i===cur);
+    var winA=m.done&&m.games[0]>m.games[1],winB=m.done&&m.games[1]>m.games[0];
+    h+='<article class="match'+(live?' live':'')+(m.done?' done':'')+'">';
+    h+='<div class="mh"><span class="t">Match '+(i+1)+' · '+slotTime(i)+'</span><span class="tag'+(live?' liveTag':'')+'">'+(m.done?'Selesai':live?'Giliran main':'Menunggu')+'</span></div>';
+    h+='<div class="teams"><div class="team'+(winA?' w':'')+'"><div class="n">'+nm(m.a[0])+'<br>'+nm(m.a[1])+'</div></div><div class="vs">lawan</div><div class="team'+(winB?' w':'')+'"><div class="n">'+nm(m.b[0])+'<br>'+nm(m.b[1])+'</div></div></div>';
+    var started=m.games[0]+m.games[1]+m.p[0]+m.p[1]>0||m.adv!==null;
+    h+='<div class="scoreRow"><div class="games">'+m.games[0]+'</div><div class="mid">game</div><div class="games">'+m.games[1]+'</div></div>';
+    if(canScore(i)){
+      var noPt=(m.adv!==null||m.sudden||(m.p[0]===3&&m.p[1]===3));
+      var l0=noPt?"–":PTS[m.p[0]],l1=noPt?"–":PTS[m.p[1]];
+      if(m.adv===0){l0="Adv";l1="–"}if(m.adv===1){l1="Adv";l0="–"}
+      h+='<div class="scoreRow"><div class="pt big">'+l0+'</div><div class="mid">poin</div><div class="pt big">'+l1+'</div></div>';
+      h+='<div class="state" aria-live="polite">'+esc(pointText(m))+'</div>';
+      h+='<div class="btns"><button data-pt="'+i+':0">+ Poin<br>'+esc(PLAYERS[m.a[0]])+' &amp; '+esc(PLAYERS[m.a[1]])+'</button><button data-pt="'+i+':1">+ Poin<br>'+esc(PLAYERS[m.b[0]])+' &amp; '+esc(PLAYERS[m.b[1]])+'</button></div>';
+    }
+    if(canAct(i)){
+      h+='<div class="mini">';
+      if((m.hn||0)>0)h+='<button data-undo="'+i+'">Undo poin</button>';
+      if(started||m.done)h+='<button data-reset="'+i+'">Reset match</button>';
+      h+='</div>';
+    }
+    h+='<div class="rest">Istirahat: '+esc(rest.map(function(k){return PLAYERS[k]}).join(", "))+'</div>';
+    h+='</article>';
+  });
+  $("jadwal").innerHTML=h;
+}
+function renderKlasemen(){
+  var s=ranked(),h=banner();
+  if(me.p!==null){
+    var mine=s.filter(function(r){return r.i===me.p})[0];
+    h+='<div class="recapCta">'+avatar(me.p,64)+'<div><h3>Recap '+esc(PLAYERS[me.p])+'</h3><p>'+(mine.played?mine.played+' match selesai · '+mine.w+' menang':'Muncul setelah match pertamamu selesai')+'</p><button class="pri" data-act="recap" data-p="'+me.p+'">Lihat recap-ku</button></div></div>';
+  }else{
+    h+='<div class="recapCta"><div><h3>Mau recap sendiri?</h3><p>Pilih namamu dan ambil selfie dulu.</p><button class="pri" data-act="pick">Pilih namamu</button></div></div>';
+  }
+  h+='<div class="tblWrap"><table><thead><tr><th>Pemain</th><th>Main</th><th>M</th><th>K</th><th>Game</th><th>+/–</th><th></th></tr></thead><tbody>';
+  s.forEach(function(r,idx){
+    var d=r.gw-r.gl,cls=[];
+    if(idx===0&&r.played>0)cls.push("top");
+    if(r.i===me.p)cls.push("mine");
+    h+='<tr class="'+cls.join(" ")+'"><td class="name">'+(idx+1)+'. '+esc(r.name)+(r.i===me.p?' (kamu)':'')+'</td><td>'+r.played+'/'+r.sched+'</td><td>'+r.w+'</td><td>'+r.l+'</td><td>'+r.gw+'–'+r.gl+'</td><td>'+(d>0?'+':'')+d+'</td><td><button class="sm" data-act="recap" data-p="'+r.i+'">Recap</button></td></tr>';
+  });
+  h+='</tbody></table></div><p class="note">Urutan: jumlah menang, lalu selisih game. M = menang, K = kalah. Tiap pemain dijadwalkan sama: '+4+' match.</p>';
+  $("klasemen").innerHTML=h;
+}
+function renderPemain(){
+  var h="";
+  PLAYERS.forEach(function(n,p){
+    var partners=[],opps={},slots=[];
+    state.matches.forEach(function(m,i){
+      var side=m.a.indexOf(p)>=0?0:m.b.indexOf(p)>=0?1:-1;
+      if(side<0)return;
+      var team=side===0?m.a:m.b,other=side===0?m.b:m.a;
+      partners.push(PLAYERS[team[0]===p?team[1]:team[0]]);
+      other.forEach(function(o){opps[PLAYERS[o]]=(opps[PLAYERS[o]]||0)+1});
+      slots.push("Match "+(i+1)+" ("+slotTime(i).split("–")[0]+")");
+    });
+    var ol=Object.keys(opps).map(function(k){return k+(opps[k]>1?" ×"+opps[k]:"")}).join(", ");
+    h+='<div class="pcard"><h3>'+esc(n)+(p===me.p?' (kamu)':'')+'</h3><p><span class="k">Main di:</span> '+esc(slots.join(", "))+'</p><p><span class="k">Partner:</span> '+esc(partners.join(", "))+'</p><p><span class="k">Lawan:</span> '+esc(ol)+'</p></div>';
+  });
+  $("pemain").innerHTML=h;
+}
+function render(){
+  renderChip();renderJadwal();renderKlasemen();renderPemain();
+  $("tools").innerHTML='<button class="dg" data-act="resetall">Hapus semua skor</button>';
+}
+
+/* ---------- kartu recap (1080 x 1920, ukuran story) ---------- */
+function rr(x,px,py,w,h,r){x.beginPath();x.moveTo(px+r,py);x.arcTo(px+w,py,px+w,py+h,r);x.arcTo(px+w,py+h,px,py+h,r);x.arcTo(px,py+h,px,py,r);x.arcTo(px,py,px+w,py,r);x.closePath()}
+function fit(x,text,maxW,size,fam,weight){var s=size;x.font=weight+" "+s+"px "+fam;while(x.measureText(text).width>maxW&&s>22){s-=2;x.font=weight+" "+s+"px "+fam}}
+function loadImg(src){return new Promise(function(res){var i=new Image();i.onload=function(){res(i)};i.onerror=function(){res(null)};i.src=src})}
+var F_DISP='"Eater","Barlow Condensed",Impact,sans-serif',F_NUM='"Barlow Condensed","Arial Narrow",Arial,sans-serif',F_TXT='"Barlow",system-ui,Arial,sans-serif';
+async function drawRecap(d){
+  try{if(document.fonts&&document.fonts.load){await Promise.all([document.fonts.load('80px "Eater"'),document.fonts.load('700 60px "Barlow Condensed"'),document.fonts.load('600 40px "Barlow"')])}}catch(e){}
+  var c=document.createElement("canvas");c.width=1080;c.height=1920;var x=c.getContext("2d");
+  var g=x.createLinearGradient(0,0,0,1920);g.addColorStop(0,"#1b0f2e");g.addColorStop(.55,"#2e1850");g.addColorStop(1,"#12081f");
+  x.fillStyle=g;x.fillRect(0,0,1080,1920);
+  var rg=x.createRadialGradient(540,560,60,540,560,620);rg.addColorStop(0,"rgba(255,138,31,.55)");rg.addColorStop(1,"rgba(255,138,31,0)");
+  x.fillStyle=rg;x.fillRect(0,0,1080,1300);
+  var seed=7;function rnd(){seed=(seed*9301+49297)%233280;return seed/233280}
+  for(var i=0;i<70;i++){x.fillStyle="rgba(243,234,216,"+(0.15+rnd()*0.5)+")";x.beginPath();x.arc(rnd()*1080,rnd()*1500,1+rnd()*2.6,0,6.283);x.fill()}
+  x.textAlign="center";x.textBaseline="alphabetic";
+  x.fillStyle="#ff8a1f";fit(x,"Halloween Tennis",900,92,F_DISP,"400");x.fillText("Halloween Tennis",540,290);
+  x.fillStyle="#f3ead8";x.font="600 40px "+F_TXT;x.fillText("Recap malam ini",540,345);
+  var cx=540,cy=585,R=185;
+  x.beginPath();x.arc(cx,cy,R+16,0,6.283);x.fillStyle="#ff8a1f";x.fill();
+  var photo=photos[d.p]?await loadImg(photos[d.p]):null;
+  x.save();x.beginPath();x.arc(cx,cy,R,0,6.283);x.clip();
+  if(photo){x.drawImage(photo,cx-R,cy-R,R*2,R*2)}
+  else{x.fillStyle="#3a1a5c";x.fillRect(cx-R,cy-R,R*2,R*2);x.fillStyle="#ff8a1f";x.font="700 260px "+F_NUM;x.textBaseline="middle";x.fillText(PLAYERS[d.p].charAt(0),cx,cy+10);x.textBaseline="alphabetic"}
+  x.restore();
+  x.font="80px sans-serif";x.fillText("🎃",190,420);x.fillText("👻",890,780);
+  x.fillStyle="#f3ead8";fit(x,PLAYERS[d.p],880,130,F_DISP,"400");x.fillText(PLAYERS[d.p],540,885);
+  x.font="700 58px "+F_NUM;var tw=x.measureText(d.title).width+90;
+  rr(x,540-tw/2,925,tw,86,43);x.fillStyle="#ff8a1f";x.fill();
+  x.fillStyle="#241733";x.fillText(d.title,540,988);
+  var boxes=[["Menang–kalah",d.w+"–"+d.l],["Game menang–kalah",d.gw+"–"+d.gl],["Selisih game",(d.diff>0?"+":"")+d.diff],["Peringkat dari 10","#"+d.rank]];
+  boxes.forEach(function(b,k){
+    var bx=80+(k%2)*480,by=1060+Math.floor(k/2)*190;
+    rr(x,bx,by,440,170,26);x.fillStyle="rgba(255,255,255,.09)";x.fill();
+    x.fillStyle="#c9b8e6";x.font="500 32px "+F_TXT;x.fillText(b[0],bx+220,by+52);
+    x.fillStyle="#f3ead8";x.font="700 96px "+F_NUM;x.fillText(b[1],bx+220,by+143);
+  });
+  x.fillStyle="#f3ead8";
+  if(d.duo){
+    var t1=(d.duo.won?"Duo terbaik: ":"Duo paling berjuang: ")+PLAYERS[d.p]+" & "+PLAYERS[d.duo.partner]+" ("+(d.duo.won?"menang ":"kalah ")+d.duo.mine+"–"+d.duo.th+")";
+    fit(x,t1,920,40,F_TXT,"600");x.fillText(t1,540,1490);
+  }
+  if(d.close){
+    var t2="Paling mepet: "+(d.close.won?"menang ":"kalah ")+d.close.mine+"–"+d.close.th+" lawan "+PLAYERS[d.close.opp[0]]+" & "+PLAYERS[d.close.opp[1]];
+    fit(x,t2,920,40,F_TXT,"600");x.fillText(t2,540,1556);
+  }
+  x.fillStyle="#a898bd";x.font="500 32px "+F_TXT;x.fillText("Sabtu 24 Okt · Medco Ampera",540,1636);
+  return c;
+}
+function openRecap(p){
+  var d=recapData(p);
+  if(!d.played){openModal('<h3>Recap '+esc(PLAYERS[p])+'</h3><p class="mtxt">Belum ada match yang selesai. Recap muncul setelah match pertama selesai.</p><div class="mrow"><button class="ghost" data-act="close">Tutup</button></div>');return}
+  recapBlob=null;
+  openModal('<h3>Recap '+esc(PLAYERS[p])+'</h3><div class="rbox" id="rbox"><p class="note">Menyiapkan gambar…</p></div><div class="mrow col"><button class="pri" data-act="sharerecap">Bagikan ke Story</button><button class="ghost" data-act="saverecap">Simpan gambar</button><button class="ghost" data-act="close">Tutup</button></div><p class="note">Tombol bagikan membuka menu share di HP-mu. Pilih Instagram, lalu Story.</p>');
+  drawRecap(d).then(function(c){
+    var url=c.toDataURL("image/png");
+    c.toBlob(function(b){recapBlob=b;recapName="halloween-tennis-"+PLAYERS[p].toLowerCase()+".png"},"image/png");
+    var box=$("rbox");if(box)box.innerHTML='<img alt="Kartu recap '+esc(PLAYERS[p])+'" src="'+url+'">';
+  }).catch(function(){var box=$("rbox");if(box)box.innerHTML='<p class="note">Gambar gagal dibuat. Coba tutup dan buka lagi.</p>'});
+}
+async function saveRecap(){
+  if(!recapBlob){toast("Gambar masih disiapkan");return}
+  var dl=null;
+  try{dl=(window.claude&&window.claude.use)?await window.claude.use("downloads"):null}catch(e){dl=null}
+  if(dl){try{await dl.save({filename:recapName,data:recapBlob});toast("Gambar disimpan");return}catch(e){if(e&&e.code==="declined")return}}
+  toast("Tekan lama gambar, lalu pilih Simpan ke Foto");
+}
+async function shareRecap(){
+  if(!recapBlob){toast("Gambar masih disiapkan");return}
+  try{
+    var f=new File([recapBlob],recapName,{type:"image/png"});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:"Halloween Tennis Recap"});return}
+  }catch(e){if(e&&e.name==="AbortError")return}
+  await saveRecap();
+}
+
+/* ---------- event ---------- */
+document.addEventListener("click",function(e){
+  var t=e.target.closest("button");
+  if(!t){if(e.target.id==="ov"){if(pending)answerConfirm(false);else closeModal()}return}
+  if(t.dataset.pt){var x=t.dataset.pt.split(":");addPoint(+x[0],+x[1]);return}
+  if(t.dataset.undo){undo(+t.dataset.undo);return}
+  if(t.dataset.reset){
+    var idx=+t.dataset.reset;
+    confirmBox("Reset skor Match "+(idx+1)+"?","Reset match").then(function(ok){
+      if(!ok||!canAct(idx))return;
+      sendOp({op:"resetmatch",i:idx,p:me.p}).then(function(){toast("Match "+(idx+1)+" direset")});
+    });
+    return;
+  }
+  if(t.dataset.tab){
+    document.querySelectorAll("nav button").forEach(function(b){b.setAttribute("aria-selected",b===t?"true":"false")});
+    document.querySelectorAll("section").forEach(function(s){s.classList.toggle("on",s.id===t.dataset.tab)});
+    window.scrollTo(0,0);return;
+  }
+  var a=t.dataset.act;if(!a)return;
+  if(a==="ok"){answerConfirm(true)}
+  else if(a==="no"){answerConfirm(false)}
+  else if(a==="close"){closeModal()}
+  else if(a==="resetall"){resetAllModal()}
+  else if(a==="rstok"){
+    var v=(($("rstIn")||{}).value||"").trim().toUpperCase();
+    if(v!=="RESET"){toast("Ketik RESET dulu");return}
+    closeModal();sendOp({op:"resetall",confirm:"RESET"}).then(function(){toast("Semua skor dihapus")});
+  }
+  else if(a==="pick"){pickPlayer()}
+  else if(a==="choose"){var np=+t.dataset.p;if(np!==me.p)me.photo=null;me.p=np;saveMe();render();selfieStep()}
+  else if(a==="profile"){profileModal()}
+  else if(a==="selfiestep"){selfieStep()}
+  else if(a==="selfie"){$("selfieIn").value="";$("selfieIn").click()}
+  else if(a==="gallery"){$("galleryIn").value="";$("galleryIn").click()}
+  else if(a==="recap"){openRecap(+t.dataset.p)}
+  else if(a==="sharerecap"){shareRecap()}
+  else if(a==="saverecap"){saveRecap()}
+});
+$("selfieIn").addEventListener("change",function(e){processFile(e.target.files&&e.target.files[0])});
+$("galleryIn").addEventListener("change",function(e){processFile(e.target.files&&e.target.files[0])});
+document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target&&e.target.id==="rstIn")document.querySelector('[data-act="rstok"]').click()});
+
+/* ---------- mulai ---------- */
+me=loadMe();
+if(me.photo&&me.p!==null)photos[me.p]=me.photo;
+state=load()||fixedSchedule();
+render();
+if(me.p===null)setTimeout(pickPlayer,350);
+pull(true);
+setInterval(pull,3000);
+})();
+</script>
+</body>
+</html>
