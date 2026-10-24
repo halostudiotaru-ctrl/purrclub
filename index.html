@@ -153,6 +153,7 @@ section{display:none;padding-top:14px}
 section.on{display:block}
 .me-n{text-decoration:underline;text-decoration-color:var(--pumpkin);text-underline-offset:3px}
 s-banner.gap{display:block;margin-bottom:16px}
+s-stack.toolbar{display:flex;flex-wrap:wrap;margin-bottom:16px}
 .matches{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
 @media (min-width:700px){.matches{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .match{display:block;border-radius:16px}
@@ -216,7 +217,7 @@ s-banner.gap{display:block;margin-bottom:16px}
   <p class="sub">Sabtu, 24 Okt · 17:00–22:00 · <s-link href="https://maps.app.goo.gl/8W14SVu49JueAfwQA?g_st=ic" target="_blank">Medco Ampera</s-link></p>
   <div id="chip"></div>
   <s-banner class="rules" tone="info" heading="Aturan">
-    Doubles, partner berganti tiap match. Satu match sampai <b>4 game</b>. Setiap game: 15–30–40, <b>deuce hanya 1 kali</b>, deuce kedua jadi <b>sudden death</b> (poin berikutnya menang). 10 match × 30 menit di 1 lapangan, tiap orang main <b>4 kali</b>.
+    Doubles, partner berganti tiap match. Satu match sampai <b>4 game</b>. Setiap game: 15–30–40, <b>deuce hanya 1 kali</b>, deuce kedua jadi <b>sudden death</b> (poin berikutnya menang). 10 match × 30 menit di 1 lapangan, tiap orang main <b>4 kali</b>. Game manual dan pergantian pemain bisa ditambah di tab Jadwal.
   </s-banner>
 </header>
 
@@ -405,6 +406,7 @@ function openModal(heading,bodyHtml,opts){
 function closeModal(){modal.hideOverlay()}
 modal.addEventListener("hide",function(){
   subCtx=null;
+  gameCtx=null;
   if(toastEl.parentNode===modal){document.body.appendChild(toastEl);if(toastOn)showToastEl()}
   if(pending){var p=pending;pending=null;p(false)}
 });
@@ -459,6 +461,29 @@ function subToModal(){
   var m=state.matches[subCtx.i],inM=m.a.concat(m.b),h='<s-paragraph color="subdued">Diganti oleh siapa?</s-paragraph><div class="pick">';
   PLAYERS.forEach(function(n,p){if(inM.indexOf(p)<0)h+=pickBtn('data-act="subto" data-p="'+p+'"',p,false)});
   openModal("Pilih pengganti",h+'</div>',{secondary:{act:"close",label:"Batal"}});
+}
+function readName(id){return (($(id)||{}).value||"").trim().replace(/\s+/g," ")}
+function addPlayerModal(){
+  openModal("Pemain baru",'<s-text-field id="npIn" label="Nama pemain" placeholder="Nama" maxlength="20" autocomplete="off"></s-text-field>',{secondary:{act:"close",label:"Batal"},primary:{act:"npok",label:"Tambah"}});
+}
+var gameCtx=null;
+function gameModal(){
+  gameCtx={sel:[]};
+  openModal("Game manual",'<div id="gameBody"></div>',{secondary:{act:"close",label:"Batal"},primary:{act:"gamego",label:"Mulai game"}});
+  paintGame();
+}
+function paintGame(){
+  var box=$("gameBody");if(!box||!gameCtx)return;
+  var keep=($("gpIn")||{}).value||"";
+  var sel=gameCtx.sel=gameCtx.sel.filter(function(p){return p<PLAYERS.length});
+  function nameAt(k){return sel[k]!==undefined?PLAYERS[sel[k]]:"…"}
+  var h='<s-stack gap="base"><s-paragraph color="subdued">Pilih 4 pemain. Dua yang pertama jadi Tim A, dua berikutnya Tim B. Ketuk lagi untuk batal.</s-paragraph>';
+  h+='<s-text type="strong">Tim A: '+esc(nameAt(0)+" & "+nameAt(1))+'</s-text><s-text type="strong">Tim B: '+esc(nameAt(2)+" & "+nameAt(3))+'</s-text><div class="pick">';
+  PLAYERS.forEach(function(n,p){h+=pickBtn('data-act="gametoggle" data-p="'+p+'"',p,sel.indexOf(p)>=0)});
+  h+='</div><s-stack direction="inline" gap="small" alignItems="end"><s-text-field id="gpIn" label="Pemain baru" placeholder="Nama" maxlength="20" autocomplete="off"></s-text-field>'+btn('variant="secondary" data-act="gameaddplayer"','Tambah')+'</s-stack></s-stack>';
+  box.innerHTML=h;
+  var f=$("gpIn");if(f)f.value=keep;
+  var go=modal.querySelector('[data-act="gamego"]');if(go)go.toggleAttribute("disabled",sel.length!==4);
 }
 function selfieStep(){
   var h='<s-stack alignItems="center" gap="base">'+avatar(me.p,140)+'<s-paragraph color="subdued">Foto dipakai di kartu recap dan tersimpan di HP ini saja.</s-paragraph></s-stack>';
@@ -552,7 +577,7 @@ function teamHtml(t,win){
   return '<s-stack alignItems="center" gap="small-200"><s-text type="strong"'+tone+'>'+nm(t[0])+'</s-text><s-text type="strong"'+tone+'>'+nm(t[1])+'</s-text></s-stack>';
 }
 function renderJadwal(){
-  var cur=firstOpen(),h=banner()+'<div class="matches">';
+  var cur=firstOpen(),h=banner()+'<s-stack class="toolbar" direction="inline" gap="small">'+btn('variant="secondary" data-act="addgame"','+ Game manual')+btn('variant="secondary" data-act="addplayer"','+ Pemain baru')+'</s-stack><div class="matches">';
   state.matches.forEach(function(m,i){
     var players=m.a.concat(m.b);
     var rest=PLAYERS.map(function(_,k){return k}).filter(function(k){return players.indexOf(k)<0});
@@ -745,6 +770,30 @@ document.addEventListener("click",function(e){
     closeModal();
     sendOp({op:"substitute",i:sc.i,side:sc.side,slot:sc.slot,p:sp}).then(function(ok){if(ok)toast("Pemain diganti: "+PLAYERS[sp])});
   }
+  else if(a==="addplayer"){addPlayerModal()}
+  else if(a==="npok"){
+    var nn=readName("npIn");
+    if(!nn){toast("Isi namanya dulu");return}
+    closeModal();
+    sendOp({op:"addplayer",name:nn}).then(function(ok){if(ok)toast("Pemain ditambahkan: "+nn)});
+  }
+  else if(a==="addgame"){gameModal()}
+  else if(a==="gametoggle"&&gameCtx){
+    var gp=+t.dataset.p,gi=gameCtx.sel.indexOf(gp);
+    if(gi>=0)gameCtx.sel.splice(gi,1);else if(gameCtx.sel.length<4)gameCtx.sel.push(gp);
+    paintGame();
+  }
+  else if(a==="gameaddplayer"&&gameCtx){
+    var gn=readName("gpIn");
+    if(!gn){toast("Isi namanya dulu");return}
+    sendOp({op:"addplayer",name:gn}).then(function(ok){if(ok){toast("Pemain ditambahkan: "+gn);var f=$("gpIn");if(f)f.value="";paintGame()}});
+  }
+  else if(a==="gamego"&&gameCtx){
+    var gs=gameCtx.sel.slice();
+    if(gs.length!==4)return;
+    closeModal();
+    sendOp({op:"addmatch",a:[gs[0],gs[1]],b:[gs[2],gs[3]]}).then(function(ok){if(ok)toast("Game manual ditambahkan")});
+  }
   else if(a==="pick"){pickPlayer()}
   else if(a==="choose"){var np=+t.dataset.p;if(np!==me.p)me.photo=null;me.p=np;saveMe();render();selfieStep()}
   else if(a==="profile"){profileModal()}
@@ -757,7 +806,12 @@ document.addEventListener("click",function(e){
 });
 $("selfieIn").addEventListener("change",function(e){processFile(e.target.files&&e.target.files[0])});
 $("galleryIn").addEventListener("change",function(e){processFile(e.target.files&&e.target.files[0])});
-document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target&&e.target.id==="rstIn"){e.preventDefault();document.querySelector('[data-act="rstok"]').click()}});
+document.addEventListener("keydown",function(e){
+  if(e.key!=="Enter"||!e.target)return;
+  var act=e.target.id==="rstIn"?"rstok":e.target.id==="npIn"?"npok":e.target.id==="gpIn"?"gameaddplayer":null;
+  if(!act)return;
+  e.preventDefault();document.querySelector('[data-act="'+act+'"]').click();
+});
 
 /* ---------- mulai ---------- */
 me=loadMe();
