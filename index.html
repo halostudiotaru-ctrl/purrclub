@@ -164,10 +164,10 @@ s-banner.gap{display:block;margin-bottom:16px}
   .kl-side{position:sticky;top:88px}
 }
 .topn{color:var(--pumpkin)}
-.pcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
-.pcard h3{margin:0 0 6px;font-family:'Barlow Condensed',sans-serif;font-size:21px}
-.pcard p{margin:3px 0;font-size:14.5px}
-.pcard .k{color:var(--muted)}
+.pgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+@media (min-width:700px){.pgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1024px){.pgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.pcard{display:block}
 /* modal */
 .pick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 @media (min-width:700px){.pick{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -514,7 +514,7 @@ function renderKlasemen(){
   $("klasemen").innerHTML=h;
 }
 function renderPemain(){
-  var h="";
+  var h='<div class="pgrid">';
   PLAYERS.forEach(function(n,p){
     var partners=[],opps={},slots=[];
     state.matches.forEach(function(m,i){
@@ -526,9 +526,9 @@ function renderPemain(){
       slots.push("Match "+(i+1)+" ("+slotTime(i).split("–")[0]+")");
     });
     var ol=Object.keys(opps).map(function(k){return k+(opps[k]>1?" ×"+opps[k]:"")}).join(", ");
-    h+='<div class="pcard"><h3>'+esc(n)+(p===me.p?' (kamu)':'')+'</h3><p><span class="k">Main di:</span> '+esc(slots.join(", "))+'</p><p><span class="k">Partner:</span> '+esc(partners.join(", "))+'</p><p><span class="k">Lawan:</span> '+esc(ol)+'</p></div>';
+    h+='<div class="pcard"><s-section heading="'+esc(n)+(p===me.p?' (kamu)':'')+'"><s-stack gap="small-200"><s-paragraph><s-text color="subdued">Main di:</s-text> '+esc(slots.join(", "))+'</s-paragraph><s-paragraph><s-text color="subdued">Partner:</s-text> '+esc(partners.join(", "))+'</s-paragraph><s-paragraph><s-text color="subdued">Lawan:</s-text> '+esc(ol)+'</s-paragraph></s-stack></s-section></div>';
   });
-  $("pemain").innerHTML=h;
+  $("pemain").innerHTML=h+'</div>';
 }
 function render(){
   renderChip();renderJadwal();renderKlasemen();renderPemain();
