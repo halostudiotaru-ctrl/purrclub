@@ -136,6 +136,7 @@ body{
 
 /* touch-target helper: wrap button labels so buttons are >= 44px tall */
 .tap{display:block;padding-block:9px;line-height:1.3;text-align:center}
+s-modal .tap{padding-block:10px}
 #nopolaris{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;background:var(--bg);color:var(--ink);font-family:var(--font)}
 #nopolaris button{padding:12px 20px;border:0;border-radius:10px;background:var(--pumpkin);color:var(--pumpkin-ink);font:700 16px var(--font);cursor:pointer}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
@@ -181,30 +182,18 @@ td button.sm{padding:6px 10px;font-size:13px;border-color:var(--pumpkin);color:v
 .recapCta{display:flex;align-items:center;gap:14px;background:var(--surface);border:2px solid var(--pumpkin);border-radius:14px;padding:14px;margin-bottom:12px}
 .recapCta h3{margin:0;font-family:'Barlow Condensed',sans-serif;font-size:22px}
 .recapCta p{margin:2px 0 8px;font-size:14px;color:var(--muted)}
-.pri{padding:11px 16px;border-radius:10px;border:0;background:var(--pumpkin);color:var(--pumpkin-ink);font:700 15px 'Barlow',sans-serif;cursor:pointer}
-.ghost{padding:11px 16px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);font:600 15px 'Barlow',sans-serif;cursor:pointer}
-.danger{padding:11px 16px;border-radius:10px;border:0;background:var(--lose);color:#fff;font:700 15px 'Barlow',sans-serif;cursor:pointer}
 .pcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
 .pcard h3{margin:0 0 6px;font-family:'Barlow Condensed',sans-serif;font-size:21px}
 .pcard p{margin:3px 0;font-size:14.5px}
 .pcard .k{color:var(--muted)}
 /* modal */
-.ov{position:fixed;inset:0;background:rgba(12,6,22,.62);display:none;align-items:flex-end;justify-content:center;z-index:50}
-.ov.on{display:flex}
-.sheet{background:var(--surface);color:var(--ink);width:100%;max-width:640px;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));max-height:94%;overflow:auto}
-.sheet h3{margin:0 0 10px;font-family:'Barlow Condensed',sans-serif;font-size:24px}
-.mtxt{margin:0 0 14px}
-.mrow{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px}
-.mrow.col{flex-direction:column}
-.mrow.col button{width:100%}
-.pick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.pick button{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;font:600 16px 'Barlow',sans-serif;cursor:pointer;text-align:left}
-.pick button.sel{border-color:var(--pumpkin);background:var(--surface2)}
-.center{text-align:center}
-.rbox{display:flex;justify-content:center}
+.pick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media (min-width:700px){.pick{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.pickItem{display:block;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--bg);cursor:pointer}
+.pickItem.sel{border-color:var(--pumpkin);background:var(--surface2)}
+.rbox{display:flex;justify-content:center;margin-bottom:12px}
 .rbox img{max-height:58vh;max-width:100%;width:auto;border-radius:12px;border:1px solid var(--line)}
-.linkbox{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:14px 'Barlow',sans-serif}
-#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;z-index:60;display:none;max-width:90%;text-align:center}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;font-family:var(--font);z-index:60;display:none;max-width:90%;text-align:center}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -237,7 +226,7 @@ td button.sm{padding:6px 10px;font-size:13px;border-color:var(--pumpkin);color:v
 <div class="tools" id="tools"></div>
 </div>
 
-<div class="ov" id="ov"></div>
+<s-modal id="modal" heading=""></s-modal>
 <div id="toast" role="status"></div>
 <input type="file" id="selfieIn" accept="image/*" capture="user" hidden>
 <input type="file" id="galleryIn" accept="image/*" hidden>
@@ -314,7 +303,8 @@ function uploadPhoto(p,data){
     .then(function(){uploadingFor=null});
 }
 function resetAllModal(){
-  openModal('<h3>Hapus semua skor?</h3><p class="mtxt">Ini menghapus skor semua match untuk semua orang. Ketik RESET untuk lanjut.</p><input class="linkbox" id="rstIn" autocomplete="off" autocapitalize="characters" placeholder="RESET"><div class="mrow"><button class="ghost" data-act="close">Batal</button><button class="danger" data-act="rstok">Hapus skor</button></div>');
+  openModal("Hapus semua skor?",'<s-paragraph>Ini menghapus skor semua match untuk semua orang. Ketik RESET untuk lanjut.</s-paragraph><s-text-field id="rstIn" label="Ketik RESET" placeholder="RESET" autocomplete="off"></s-text-field>',
+    {secondary:{act:"close",label:"Batal"},primary:{act:"rstok",label:"Hapus skor",critical:true}});
 }
 
 /* ---------- logika skor ---------- */
@@ -356,15 +346,26 @@ function pointText(m){
 }
 
 /* ---------- modal ---------- */
-function openModal(html){var ov=$("ov");ov.innerHTML='<div class="sheet" role="dialog" aria-modal="true">'+html+'</div>';ov.classList.add("on")}
-function closeModal(){var ov=$("ov");ov.classList.remove("on");ov.innerHTML="";if(pending){var p=pending;pending=null;p(false)}}
+var modal=$("modal");
+function openModal(heading,bodyHtml,opts){
+  opts=opts||{};
+  var h=bodyHtml||"";
+  if(opts.secondary)h+=btn('slot="secondary-actions" variant="secondary" data-act="'+opts.secondary.act+'"',esc(opts.secondary.label));
+  if(opts.primary)h+=btn('slot="primary-action" variant="primary"'+(opts.primary.critical?' tone="critical"':'')+' data-act="'+opts.primary.act+'"',esc(opts.primary.label));
+  modal.setAttribute("heading",heading||"");
+  modal.setAttribute("size",opts.size||"base");
+  modal.innerHTML=h;
+  modal.showOverlay();
+}
+function closeModal(){modal.hideOverlay()}
+modal.addEventListener("hide",function(){if(pending){var p=pending;pending=null;p(false)}});
 function confirmBox(msg,okLabel){
   return new Promise(function(res){
     pending=res;
-    openModal('<p class="mtxt">'+esc(msg)+'</p><div class="mrow"><button class="ghost" data-act="no">Batal</button><button class="danger" data-act="ok">'+esc(okLabel)+'</button></div>');
+    openModal("Konfirmasi",'<s-paragraph>'+esc(msg)+'</s-paragraph>',{secondary:{act:"no",label:"Batal"},primary:{act:"ok",label:okLabel,critical:true}});
   });
 }
-function answerConfirm(v){var p=pending;pending=null;var ov=$("ov");ov.classList.remove("on");ov.innerHTML="";if(p)p(v)}
+function answerConfirm(v){var p=pending;pending=null;modal.hideOverlay();if(p)p(v)}
 
 /* ---------- avatar & profil ---------- */
 function avatarSize(px){return px<=40?"small":px<=72?"large":"large-200"}
@@ -381,19 +382,20 @@ function renderChip(){
   var se=$("sync");if(se&&online!==null)se.textContent=online?"● Live":"● Offline, coba lagi otomatis";
 }
 function pickPlayer(){
-  var h='<h3>Kamu yang mana?</h3><div class="pick">';
-  PLAYERS.forEach(function(n,i){h+='<button data-act="choose" data-p="'+i+'"'+(i===me.p?' class="sel"':'')+'>'+avatar(i,32)+'<span>'+esc(n)+'</span></button>'});
-  h+='</div><div class="mrow"><button class="ghost" data-act="close">Nanti saja</button></div>';
-  openModal(h);
+  var h='<div class="pick">';
+  PLAYERS.forEach(function(n,i){h+='<s-clickable class="pickItem'+(i===me.p?' sel':'')+'" data-act="choose" data-p="'+i+'" accessibilityLabel="'+esc(n)+'"><s-stack direction="inline" alignItems="center" gap="small">'+avatar(i,32)+'<s-text type="strong">'+esc(n)+'</s-text></s-stack></s-clickable>'});
+  h+='</div>';
+  openModal("Kamu yang mana?",h,{secondary:{act:"close",label:"Nanti saja"}});
 }
 function selfieStep(){
-  var h='<h3>Selfie buat recap-mu</h3><div class="center">'+avatar(me.p,140)+'</div>';
-  h+='<p class="note center">Foto dipakai di kartu recap dan tersimpan di HP ini saja.</p><div class="mrow col"><button class="pri" data-act="selfie">'+(me.photo?'Ambil ulang selfie':'Ambil selfie')+'</button><button class="ghost" data-act="gallery">Pilih dari galeri</button><button class="ghost" data-act="close">'+(me.photo?'Selesai':'Lewati')+'</button></div>';
-  openModal(h);
+  var h='<s-stack alignItems="center" gap="base">'+avatar(me.p,140)+'<s-paragraph color="subdued">Foto dipakai di kartu recap dan tersimpan di HP ini saja.</s-paragraph></s-stack>';
+  h+='<s-stack gap="small">'+btn('variant="primary" inlineSize="fill" data-act="selfie"',me.photo?'Ambil ulang selfie':'Ambil selfie')+btn('variant="secondary" inlineSize="fill" data-act="gallery"','Pilih dari galeri')+btn('variant="tertiary" inlineSize="fill" data-act="close"',me.photo?'Selesai':'Lewati')+'</s-stack>';
+  openModal("Selfie buat recap-mu",h);
 }
 function profileModal(){
-  var h='<h3>'+esc(PLAYERS[me.p])+'</h3><div class="center">'+avatar(me.p,120)+'</div><div class="mrow col"><button class="pri" data-act="recap" data-p="'+me.p+'">Lihat recap-ku</button><button class="ghost" data-act="selfiestep">'+(me.photo?'Ganti foto':'Tambah selfie')+'</button><button class="ghost" data-act="pick">Ganti pemain</button><button class="ghost" data-act="close">Tutup</button></div>';
-  openModal(h);
+  var h='<s-stack alignItems="center" gap="base">'+avatar(me.p,120)+'</s-stack>';
+  h+='<s-stack gap="small">'+btn('variant="primary" inlineSize="fill" data-act="recap" data-p="'+me.p+'"','Lihat recap-ku')+btn('variant="secondary" inlineSize="fill" data-act="selfiestep"',me.photo?'Ganti foto':'Tambah selfie')+btn('variant="secondary" inlineSize="fill" data-act="pick"','Ganti pemain')+btn('variant="tertiary" inlineSize="fill" data-act="close"','Tutup')+'</s-stack>';
+  openModal(PLAYERS[me.p],h);
 }
 function processFile(file){
   if(!file)return;
@@ -592,15 +594,15 @@ async function drawRecap(d){
   return c;
 }
 function openRecap(p){
-  var d=recapData(p);
-  if(!d.played){openModal('<h3>Recap '+esc(PLAYERS[p])+'</h3><p class="mtxt">Belum ada match yang selesai. Recap muncul setelah match pertama selesai.</p><div class="mrow"><button class="ghost" data-act="close">Tutup</button></div>');return}
+  var d=recapData(p),title="Recap "+PLAYERS[p];
+  if(!d.played){openModal(title,'<s-paragraph>Belum ada match yang selesai. Recap muncul setelah match pertama selesai.</s-paragraph>',{secondary:{act:"close",label:"Tutup"}});return}
   recapBlob=null;
-  openModal('<h3>Recap '+esc(PLAYERS[p])+'</h3><div class="rbox" id="rbox"><p class="note">Menyiapkan gambar…</p></div><div class="mrow col"><button class="pri" data-act="sharerecap">Bagikan ke Story</button><button class="ghost" data-act="saverecap">Simpan gambar</button><button class="ghost" data-act="close">Tutup</button></div><p class="note">Tombol bagikan membuka menu share di HP-mu. Pilih Instagram, lalu Story.</p>');
+  openModal(title,'<div class="rbox" id="rbox"><s-text color="subdued">Menyiapkan gambar…</s-text></div><s-stack gap="small">'+btn('variant="primary" inlineSize="fill" data-act="sharerecap"','Bagikan ke Story')+btn('variant="secondary" inlineSize="fill" data-act="saverecap"','Simpan gambar')+btn('variant="tertiary" inlineSize="fill" data-act="close"','Tutup')+'</s-stack><s-paragraph color="subdued">Tombol bagikan membuka menu share di HP-mu. Pilih Instagram, lalu Story.</s-paragraph>',{size:"large"});
   drawRecap(d).then(function(c){
     var url=c.toDataURL("image/png");
     c.toBlob(function(b){recapBlob=b;recapName="halloween-tennis-"+PLAYERS[p].toLowerCase()+".png"},"image/png");
     var box=$("rbox");if(box)box.innerHTML='<img alt="Kartu recap '+esc(PLAYERS[p])+'" src="'+url+'">';
-  }).catch(function(){var box=$("rbox");if(box)box.innerHTML='<p class="note">Gambar gagal dibuat. Coba tutup dan buka lagi.</p>'});
+  }).catch(function(){var box=$("rbox");if(box)box.innerHTML='<s-text color="subdued">Gambar gagal dibuat. Coba tutup dan buka lagi.</s-text>'});
 }
 async function saveRecap(){
   if(!recapBlob){toast("Gambar masih disiapkan");return}
@@ -621,7 +623,7 @@ async function shareRecap(){
 /* ---------- event ---------- */
 document.addEventListener("click",function(e){
   var t=e.target.closest("s-button, s-clickable, button");
-  if(!t){if(e.target.id==="ov"){if(pending)answerConfirm(false);else closeModal()}return}
+  if(!t)return;
   if(t.dataset.pt){var x=t.dataset.pt.split(":");addPoint(+x[0],+x[1]);return}
   if(t.dataset.undo){undo(+t.dataset.undo);return}
   if(t.dataset.reset){
@@ -659,7 +661,7 @@ document.addEventListener("click",function(e){
 });
 $("selfieIn").addEventListener("change",function(e){processFile(e.target.files&&e.target.files[0])});
 $("galleryIn").addEventListener("change",function(e){processFile(e.target.files&&e.target.files[0])});
-document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target&&e.target.id==="rstIn")document.querySelector('[data-act="rstok"]').click()});
+document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target&&e.target.id==="rstIn"){e.preventDefault();document.querySelector('[data-act="rstok"]').click()}});
 
 /* ---------- mulai ---------- */
 me=loadMe();
