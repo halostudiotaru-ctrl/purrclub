@@ -21,22 +21,27 @@ require.cache[require.resolve("../../lib/redis.js")] = {
     },
   },
 };
-const handler = require("../../api/state.js");
+const stateHandler = require("../../api/state.js");
+const sessionsHandler = require("../../api/sessions.js");
 
 const json = (route, status, body) =>
   route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
-// Route entries for open({ routes }): the real /api/state handler backed by memory, and photos that are always empty.
+async function run(handler, route) {
+  const req = route.request();
+  const out = { status: 200, body: {} };
+  const res = { setHeader() {}, status(c) { out.status = c; return { json(j) { out.body = j; } }; } };
+  const query = Object.fromEntries(new URL(req.url()).searchParams);
+  await handler({ method: req.method(), body: req.postData() || undefined, query }, res);
+  await json(route, out.status, out.body);
+}
+
+// Route entries for open({ routes }): the real api handlers backed by memory, and photos that are always empty.
 export function fakeApi() {
   kv.clear(); hs.clear();
   return [
-    [/\/api\/state(\?|$)/, async (route) => {
-      const req = route.request();
-      const out = { status: 200, body: {} };
-      const res = { setHeader() {}, status(c) { out.status = c; return { json(j) { out.body = j; } }; } };
-      await handler({ method: req.method(), body: req.postData() || undefined }, res);
-      await json(route, out.status, out.body);
-    }],
+    [/\/api\/state(\?|$)/, (route) => run(stateHandler, route)],
+    [/\/api\/sessions(\?|$)/, (route) => run(sessionsHandler, route)],
     [/\/api\/photo/, (route) => json(route, 200, { photo: null })],
   ];
 }

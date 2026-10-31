@@ -17,6 +17,7 @@ header{padding:22px 0 12px}
 .sub{margin:8px 0 0;color:var(--muted);font-size:14.5px}
 #chip{margin-top:12px;display:flex;align-items:center;flex-wrap:wrap;gap:10px}
 .rules{display:block;margin-top:14px}
+.sessbar{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
 .chip{display:inline-flex;align-items:center;min-block-size:44px;padding:5px 16px 5px 5px;border:1px solid var(--line);border-radius:999px;background:var(--surface);cursor:pointer}
 .tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;gap:8px;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line)}
 .tabs>[data-tab]{flex:1;min-inline-size:0}
@@ -213,10 +214,11 @@ s-stack.toolbar{display:flex;flex-wrap:wrap;margin-bottom:16px}
 <script>window.addEventListener("load",function(){if(!customElements.get("s-button"))document.getElementById("nopolaris").hidden=false})</script>
 <div class="wrap">
 <header>
-  <h1 class="title">Halloween Tennis</h1>
-  <p class="sub">Sabtu, 24 Okt · 17:00–22:00 · <s-link href="https://maps.app.goo.gl/8W14SVu49JueAfwQA?g_st=ic" target="_blank">Medco Ampera</s-link></p>
+  <h1 class="title" id="sTitle">Halloween Tennis</h1>
+  <p class="sub" id="sSub">Sabtu, 24 Okt · 17:00–22:00 · <s-link href="https://maps.app.goo.gl/8W14SVu49JueAfwQA?g_st=ic" target="_blank">Medco Ampera</s-link></p>
   <div id="chip"></div>
-  <s-banner class="rules" tone="info" heading="Aturan">
+  <div id="sessbar" class="sessbar"></div>
+  <s-banner class="rules" id="rules" tone="info" heading="Aturan">
     Doubles, partner berganti tiap match. Satu match sampai <b>4 game</b>. Setiap game: 15–30–40, <b>deuce hanya 1 kali</b>, deuce kedua jadi <b>sudden death</b> (poin berikutnya menang). 10 match × 30 menit di 1 lapangan, tiap orang main <b>4 kali</b>. Game manual dan pergantian pemain bisa ditambah di tab Jadwal.
   </s-banner>
 </header>
@@ -248,6 +250,8 @@ var BASE="https://claude.ai/artifact/UFPGpWiytzJERZ9XPK2Xsf";
 var FIXED=[1,2,9,7,0,8,6,3,7,2,4,5,1,6,3,9,0,5,8,4,7,3,9,6,2,5,0,1,7,4,8,9,6,0,5,1,8,3,4,2];
 var state=null,me={p:null,photo:null,name:null},photos={},photoVer={},pending=null,recapBlob=null,recapName="recap.png",toastT=null;
 var rev=0,inflight=0,online=null,uploadingFor=null;
+var viewSid=null,quiet=false,synced=false,hdrKey=null,wz=null,LEGACY_ID="halloween";
+var HEAD0={title:$("sTitle").innerHTML,sub:$("sSub").innerHTML,rules:$("rules").innerHTML,doc:document.title};
 
 /* ---------- util ---------- */
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -278,7 +282,14 @@ function toast(t){
   toastT=setTimeout(function(){toastOn=false;hideToastEl()},2800);
 }
 function btn(attrs,label){return '<s-button '+attrs+'><span class="tap">'+label+'</span></s-button>'}
-function slotTime(i){var mins=17*60+i*30;function f(x){var h=Math.floor(x/60),mi=x%60;return (h<10?"0":"")+h+":"+(mi<10?"0":"")+mi}return f(mins)+"–"+f(mins+30)}
+function hm(m){m=((m%1440)+1440)%1440;var h=Math.floor(m/60),mi=m%60;return (h<10?"0":"")+h+":"+(mi<10?"0":"")+mi}
+function sess(){return (state&&state.session)||null}
+function cfg(){var s=sess();return s&&s.config?s.config:{startTime:"17:00",slotMin:30,durationMin:300}}
+function startMin(c){var p=String(c.startTime).split(":");return (+p[0])*60+(+p[1])}
+function slotTime(i){var c=cfg(),s=startMin(c)+i*c.slotMin;return hm(s)+"–"+hm(s+c.slotMin)}
+function isLegacy(){return !state.sid||state.sid===LEGACY_ID}
+function isRO(){var s=sess();return !!(s&&s.readOnly)}
+function sidQ(sep){return state&&state.sid?sep+"sid="+encodeURIComponent(state.sid):""}
 function freshMatch(f){return {a:[f[0],f[1]],b:[f[2],f[3]],manual:false,games:[0,0],p:[0,0],adv:null,deuceN:0,sudden:false,done:false,hn:0}}
 function fixedSchedule(){var ms=[];for(var m=0;m<DEFAULT_M;m++)ms.push(freshMatch(FIXED.slice(m*4,m*4+4)));return {players:DEFAULT_PLAYERS.slice(),cur:null,matches:ms}}
 function matchLabel(m,i){return m.manual?"Game manual":slotTime(i)}
@@ -298,11 +309,18 @@ function api(path,opt){
 function setOnline(v){if(online===v)return;online=v;var e=$("sync");if(e)e.textContent=v===null?"":(v?"● Live":"● Offline, coba lagi otomatis")}
 function fixMe(){
   if(me.p===null)return false;
-  if(me.p>=PLAYERS.length||(me.name&&PLAYERS[me.p]!==me.name)){me.p=null;me.photo=null;me.name=null;saveMe();return true}
+  if(me.p>=PLAYERS.length||(me.name&&PLAYERS[me.p]!==me.name)){
+    var k=me.name?PLAYERS.indexOf(me.name):-1;
+    if(k>=0){me.p=k;saveMe();return false}
+    me.p=null;me.photo=null;me.name=null;saveMe();return true;
+  }
   if(!me.name){me.name=PLAYERS[me.p];saveMe()}
   return false;
 }
 function adopt(r){
+  var prev=state.sid||null,isNew=!!(r.sid&&r.sid!==prev),switched=!!(isNew&&prev);
+  if(isNew){photos={};photoVer={};rev=0;subCtx=null;gameCtx=null;wz=null}
+  state.sid=r.sid||null;state.active=r.active||null;state.session=r.session||null;state.suggest=r.suggest||null;
   state.cur=typeof r.cur==="number"?r.cur:null;
   if(Array.isArray(r.players))state.players=r.players;
   PLAYERS=state.players;
@@ -310,12 +328,21 @@ function adopt(r){
     var old=state.matches[i]||{};
     return {a:m.a||old.a||[0,1],b:m.b||old.b||[2,3],manual:!!m.manual,games:m.games,p:m.p,adv:m.adv,deuceN:m.deuceN,sudden:m.sudden,done:m.done,hn:m.hn||0};
   });
-  if(fixMe()&&!modalIsOpen())pickPlayer();
+  var announce=switched&&synced&&!quiet;
+  if(announce){if(modalIsOpen())closeModal();toast("Sesi aktif: "+((r.session&&r.session.name)||""))}
+  if(switched)quiet=false;
+  if(fixMe()){
+    if(announce)setTimeout(function(){if(!modalIsOpen())pickPlayer()},350);
+    else if(!modalIsOpen())pickPlayer();
+  }
+  if(isNew&&me.photo&&me.p!==null)photos[me.p]=me.photo;
+  synced=true;
   try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
 }
 function sendOp(body){
+  if(isRO()){toast("Sesi lama hanya bisa dilihat");return Promise.resolve(false)}
   inflight++;
-  return api("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+  return api("/api/state"+sidQ("?"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
     .then(function(r){setOnline(true);inflight--;if(inflight===0){adopt(r);rev=r.rev;render()}return true})
     .catch(function(e){
       inflight--;
@@ -325,16 +352,16 @@ function sendOp(body){
     });
 }
 function pull(force){
-  return api("/api/state").then(function(s){
+  return api("/api/state"+(viewSid?"?sid="+encodeURIComponent(viewSid):"")).then(function(s){
     setOnline(true);
     var changed=false;
-    if(s.matches&&(inflight===0||force)&&s.rev!==rev){adopt(s);rev=s.rev;changed=true}
+    if(s.matches&&(inflight===0||force)&&(s.rev!==rev||(s.sid||null)!==(state.sid||null))){adopt(s);rev=s.rev;changed=true}
     var jobs=[];
     Object.keys(s.photos||{}).forEach(function(k){
       var p=+k;
       if(photoVer[p]!==s.photos[k]){
         photoVer[p]=s.photos[k];
-        jobs.push(api("/api/photo?p="+p).then(function(r){if(r.photo){photos[p]=r.photo;changed=true}}).catch(function(){photoVer[p]=null}));
+        jobs.push(api("/api/photo?p="+p+sidQ("&")).then(function(r){if(r.photo){photos[p]=r.photo;changed=true}}).catch(function(){photoVer[p]=null}));
       }
     });
     if(s.photos){
@@ -345,14 +372,17 @@ function pull(force){
       });
     }
     return Promise.all(jobs).then(function(){
-      if(me.p!==null&&me.photo&&!(s.photos&&s.photos[me.p]))uploadPhoto(me.p,me.photo);
+      if(me.p!==null&&me.photo&&!isRO()&&!(s.photos&&s.photos[me.p]))uploadPhoto(me.p,me.photo);
       if(changed)render();
     });
-  }).catch(function(){setOnline(false)});
+  }).catch(function(e){
+    if(e&&e.status===404&&viewSid){viewSid=null;quiet=true;return pull(true)}
+    setOnline(false);
+  });
 }
 function uploadPhoto(p,data){
   if(uploadingFor===p)return;uploadingFor=p;
-  return api("/api/photo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({p:p,photo:data})})
+  return api("/api/photo"+sidQ("?"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({p:p,photo:data})})
     .then(function(r){photoVer[p]=r.v;toast("Foto terkirim ke semua orang")})
     .catch(function(){toast("Foto tersimpan di HP, belum terkirim")})
     .then(function(){uploadingFor=null});
@@ -665,8 +695,21 @@ function renderPemain(){
   });
   $("pemain").innerHTML=h+'</div>';
 }
+var RULES_NEW='Doubles, partner berganti tiap match. Satu match sampai <b>4 game</b>. Setiap game: 15–30–40, <b>deuce hanya 1 kali</b>, deuce kedua jadi <b>sudden death</b> (poin berikutnya menang). Jadwal dibuat otomatis supaya jumlah main tiap orang sama atau selisih satu. Game manual dan pergantian pemain bisa ditambah di tab Jadwal.';
+function renderHeader(){
+  var s=sess(),legacy=isLegacy();
+  var key=legacy?"legacy":state.sid+"|"+s.name+"|"+s.note+"|"+s.config.startTime+"|"+s.config.durationMin;
+  if(key===hdrKey)return;
+  hdrKey=key;
+  var t=$("sTitle"),sub=$("sSub"),ru=$("rules");
+  if(legacy){t.innerHTML=HEAD0.title;sub.innerHTML=HEAD0.sub;ru.innerHTML=HEAD0.rules;document.title=HEAD0.doc;return}
+  t.textContent=s.name;
+  sub.textContent=(s.note?s.note+" · ":"")+hm(startMin(s.config))+"–"+hm(startMin(s.config)+s.config.durationMin);
+  ru.innerHTML=RULES_NEW;
+  document.title=s.name;
+}
 function render(){
-  renderChip();renderJadwal();renderKlasemen();renderPemain();
+  renderHeader();renderChip();renderJadwal();renderKlasemen();renderPemain();
   $("tools").innerHTML=btn('variant="secondary" tone="critical" data-act="resetall"','Hapus semua skor');
 }
 
@@ -675,6 +718,9 @@ function rr(x,px,py,w,h,r){x.beginPath();x.moveTo(px+r,py);x.arcTo(px+w,py,px+w,
 function fit(x,text,maxW,size,fam,weight){var s=size;x.font=weight+" "+s+"px "+fam;while(x.measureText(text).width>maxW&&s>22){s-=2;x.font=weight+" "+s+"px "+fam}}
 function loadImg(src){return new Promise(function(res){var i=new Image();i.onload=function(){res(i)};i.onerror=function(){res(null)};i.src=src})}
 var F_DISP='"Eater","Barlow Condensed",Impact,sans-serif',F_NUM='"Barlow Condensed","Arial Narrow",Arial,sans-serif',F_TXT='"Barlow",system-ui,Arial,sans-serif';
+function recapTitle(){return isLegacy()?"Halloween Tennis":(sess().name||"Mabar")}
+function recapNote(){return isLegacy()?"Sabtu 24 Okt · Medco Ampera":(sess().note||"")}
+function slug(s){return String(s).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"recap"}
 async function drawRecap(d){
   try{if(document.fonts&&document.fonts.load){await Promise.all([document.fonts.load('80px "Eater"'),document.fonts.load('700 60px "Barlow Condensed"'),document.fonts.load('600 40px "Barlow"')])}}catch(e){}
   var c=document.createElement("canvas");c.width=1080;c.height=1920;var x=c.getContext("2d");
@@ -685,8 +731,9 @@ async function drawRecap(d){
   var seed=7;function rnd(){seed=(seed*9301+49297)%233280;return seed/233280}
   for(var i=0;i<70;i++){x.fillStyle="rgba(243,234,216,"+(0.15+rnd()*0.5)+")";x.beginPath();x.arc(rnd()*1080,rnd()*1500,1+rnd()*2.6,0,6.283);x.fill()}
   x.textAlign="center";x.textBaseline="alphabetic";
-  x.fillStyle="#ff8a1f";fit(x,"Halloween Tennis",900,92,F_DISP,"400");x.fillText("Halloween Tennis",540,290);
-  x.fillStyle="#f3ead8";x.font="600 40px "+F_TXT;x.fillText("Recap malam ini",540,345);
+  var rt=recapTitle();
+  x.fillStyle="#ff8a1f";fit(x,rt,900,92,F_DISP,"400");x.fillText(rt,540,290);
+  x.fillStyle="#f3ead8";x.font="600 40px "+F_TXT;x.fillText(isLegacy()?"Recap malam ini":"Recap sesi ini",540,345);
   var cx=540,cy=585,R=185;
   x.beginPath();x.arc(cx,cy,R+16,0,6.283);x.fillStyle="#ff8a1f";x.fill();
   var photo=photos[d.p]?await loadImg(photos[d.p]):null;
@@ -715,7 +762,7 @@ async function drawRecap(d){
     var t2="Paling mepet: "+(d.close.won?"menang ":"kalah ")+d.close.mine+"–"+d.close.th+" lawan "+PLAYERS[d.close.opp[0]]+" & "+PLAYERS[d.close.opp[1]];
     fit(x,t2,920,40,F_TXT,"600");x.fillText(t2,540,1556);
   }
-  x.fillStyle="#a898bd";x.font="500 32px "+F_TXT;x.fillText("Sabtu 24 Okt · Medco Ampera",540,1636);
+  x.fillStyle="#a898bd";x.font="500 32px "+F_TXT;x.fillText(recapNote(),540,1636);
   return c;
 }
 function openRecap(p){
@@ -725,7 +772,7 @@ function openRecap(p){
   openModal(title,'<div class="rbox" id="rbox"><s-text color="subdued">Menyiapkan gambar…</s-text></div><s-stack gap="small">'+btn('variant="primary" inlineSize="fill" data-act="sharerecap"','Bagikan ke Story')+btn('variant="secondary" inlineSize="fill" data-act="saverecap"','Simpan gambar')+btn('variant="tertiary" inlineSize="fill" data-act="close"','Tutup')+'</s-stack><s-paragraph color="subdued">Tombol bagikan membuka menu share di HP-mu. Pilih Instagram, lalu Story.</s-paragraph>',{size:"large"});
   drawRecap(d).then(function(c){
     var url=c.toDataURL("image/png");
-    c.toBlob(function(b){recapBlob=b;recapName="halloween-tennis-"+PLAYERS[p].toLowerCase()+".png"},"image/png");
+    c.toBlob(function(b){recapBlob=b;recapName=slug(recapTitle())+"-"+slug(PLAYERS[p])+".png"},"image/png");
     var box=$("rbox");if(box)box.innerHTML='<img alt="Kartu recap '+esc(PLAYERS[p])+'" src="'+url+'">';
   }).catch(function(){var box=$("rbox");if(box)box.innerHTML='<s-text color="subdued">Gambar gagal dibuat. Coba tutup dan buka lagi.</s-text>'});
 }
@@ -740,7 +787,7 @@ async function shareRecap(){
   if(!recapBlob){toast("Gambar masih disiapkan");return}
   try{
     var f=new File([recapBlob],recapName,{type:"image/png"});
-    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:"Halloween Tennis Recap"});return}
+    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:recapTitle()+" Recap"});return}
   }catch(e){if(e&&e.name==="AbortError")return}
   await saveRecap();
 }
