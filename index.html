@@ -155,6 +155,9 @@ section.on{display:block}
 .me-n{text-decoration:underline;text-decoration-color:var(--pumpkin);text-underline-offset:3px}
 s-banner.gap{display:block;margin-bottom:16px}
 s-stack.toolbar{display:flex;flex-wrap:wrap;margin-bottom:16px}
+s-stack.sesscard{display:flex;margin-bottom:12px}
+.cnt{display:block;font-size:12.5px;font-weight:500;color:var(--muted)}
+@media (min-width:490px){#klasemen .cnt{display:none}}
 .matches{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
 @media (min-width:700px){.matches{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .match{display:block;border-radius:16px}
@@ -737,8 +740,22 @@ function teamHtml(t,win){
   var tone=win?' tone="success"':'';
   return '<s-stack alignItems="center" gap="small-200"><s-text type="strong"'+tone+'>'+nm(t[0])+'</s-text><s-text type="strong"'+tone+'>'+nm(t[1])+'</s-text></s-stack>';
 }
+function fairLine(){
+  var c={};
+  stats().forEach(function(r){c[r.sched]=(c[r.sched]||0)+1});
+  var ks=Object.keys(c).map(Number).sort(function(a,b){return a-b});
+  if(ks.length===1)return "Tiap pemain main "+ks[0]+" game";
+  return ks.map(function(k){return c[k]+" orang main "+k+" kali"}).join(", ");
+}
+function sessionCard(){
+  if(!state.matches.length)return '';
+  var st=stats(),sc=st.map(function(r){return r.sched}),mn=Math.min.apply(null,sc),mx=Math.max.apply(null,sc);
+  var h='<s-stack class="sesscard" gap="small-200"><s-text type="strong">'+esc(fairLine())+'</s-text><s-text color="subdued">'+PLAYERS.length+' pemain · '+state.matches.length+' match</s-text>';
+  if(mn<mx)h+='<s-text color="subdued">Paling sedikit ('+mn+' game): '+esc(st.filter(function(r){return r.sched===mn}).map(function(r){return r.name}).join(", "))+'</s-text>';
+  return h+'</s-stack>';
+}
 function renderJadwal(){
-  var cur=firstOpen(),h=banner()+'<s-stack class="toolbar" direction="inline" gap="small">'+btn('variant="secondary" data-act="addgame"','+ Game manual')+btn('variant="secondary" data-act="addplayer"','+ Pemain baru')+'</s-stack><div class="matches">';
+  var cur=firstOpen(),h=sessionCard()+banner()+'<s-stack class="toolbar" direction="inline" gap="small">'+btn('variant="secondary" data-act="addgame"','+ Game manual')+btn('variant="secondary" data-act="addplayer"','+ Pemain baru')+'</s-stack><div class="matches">';
   state.matches.forEach(function(m,i){
     var players=m.a.concat(m.b);
     var rest=PLAYERS.map(function(_,k){return k}).filter(function(k){return players.indexOf(k)<0});
@@ -789,7 +806,7 @@ function renderKlasemen(){
   h+='<s-table-header-row><s-table-header listSlot="primary">Pemain</s-table-header><s-table-header listSlot="inline" format="numeric">Main</s-table-header><s-table-header listSlot="inline" format="numeric">Menang</s-table-header><s-table-header listSlot="inline" format="numeric">Kalah</s-table-header><s-table-header listSlot="inline" format="numeric">Game</s-table-header><s-table-header listSlot="inline" format="numeric">Selisih</s-table-header><s-table-header listSlot="secondary">Recap</s-table-header></s-table-header-row><s-table-body>';
   s.forEach(function(r,idx){
     var d=r.gw-r.gl,top=(idx===0&&r.played>0);
-    var name='<span class="pn"><b'+(top?' class="topn"':'')+'>'+(idx+1)+'. '+esc(r.name)+'</b>'+(r.i===me.p?'<s-badge tone="info">kamu</s-badge>':'')+'</span>';
+    var name='<span class="pn"><b'+(top?' class="topn"':'')+'>'+(idx+1)+'. '+esc(r.name)+'</b>'+(r.i===me.p?'<s-badge tone="info">kamu</s-badge>':'')+'<span class="cnt">main '+r.played+'/'+r.sched+'</span></span>';
     /* lbl: visible label in the phone list only; lo: column hidden in the phone list */
     var num=function(v,lbl,lo){return '<s-table-cell'+(lo?' class="lo"':'')+'><span class="num">'+(lbl?'<span class="lbl">'+lbl+' </span>':'')+v+'</span></s-table-cell>'};
     h+='<s-table-row><s-table-cell>'+name+'</s-table-cell>'+num(r.played+'/'+r.sched,'',1)+num(r.w,'Menang')+num(r.l,'Kalah')+num(r.gw+'–'+r.gl,'',1)+num((d>0?'+':'')+d,'Selisih')+'<s-table-cell><span class="rc">'+btn('variant="secondary" data-act="recap" data-p="'+r.i+'"','Recap')+'</span></s-table-cell></s-table-row>';

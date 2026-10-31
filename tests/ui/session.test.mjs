@@ -151,3 +151,29 @@ test("create flow: a suggestion never goes past the 720-minute limit", async () 
   await page.keyboard.press("Escape");
   await ctx.close();
 });
+
+test("session card says how many matches each player gets and updates after a manual game", async () => {
+  const { page, ctx } = await open({ routes: fakeApi() });
+  await waitLive(page);
+  const card = page.locator("#jadwal .sesscard");
+  assert.ok((await card.textContent()).includes("Tiap pemain main 4 game"));
+  assert.ok((await card.textContent()).includes("10 pemain · 10 match"));
+  await page.evaluate(async () => {
+    await fetch("/api/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "addmatch", a: [0, 1], b: [2, 3] }) });
+  });
+  await page.waitForFunction(() => document.querySelector("#jadwal .sesscard").textContent.includes("6 orang main 4 kali, 4 orang main 5 kali"));
+  assert.ok((await card.textContent()).includes("Paling sedikit (4 game)"));
+  await ctx.close();
+});
+
+test("klasemen: phones show the match count under the name; wide screens keep the Main column only", async () => {
+  for (const [w, visible] of [[390, true], [768, false]]) {
+    const { page, ctx } = await open({ routes: fakeApi(), width: w, height: 900 });
+    await waitLive(page);
+    await page.click('[data-tab="klasemen"]');
+    const cnt = page.locator("#klasemen .cnt").first();
+    assert.equal(await cnt.isVisible(), visible, `${w}px`);
+    assert.equal((await cnt.textContent()).trim(), "main 0/4");
+    await ctx.close();
+  }
+});
