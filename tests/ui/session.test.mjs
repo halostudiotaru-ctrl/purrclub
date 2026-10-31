@@ -133,3 +133,21 @@ test("create flow: step 1 rejects bad numbers and the summary offers both nearby
   await page.keyboard.press("Escape");
   await ctx.close();
 });
+
+test("create flow: a suggestion never goes past the 720-minute limit", async () => {
+  const { page, ctx } = await open({ routes: fakeApi() });
+  await waitLive(page);
+  await page.click('[data-act="wznew"]');
+  await waitModal(page, true);
+  await fill(page, "wzDur", "600");
+  await fill(page, "wzSlot", "60");
+  await page.click('s-modal [data-act="wznext"]');
+  await waitModalText(page, "2/3");
+  await addPlayers(page, ["A1", "A2", "A3", "A4", "A5", "A6", "A7"]);     // 10 matches: 7 is fair, 14 would be 840 min
+  await page.click('s-modal [data-act="wznext"]');
+  await waitModalText(page, "Tiap pemain main 5–6 game");
+  assert.equal(await page.locator('s-modal [data-act="wzsug"]').count(), 1);
+  assert.ok((await page.locator('s-modal [data-act="wzsug"]').textContent()).includes("7 match"));
+  await page.keyboard.press("Escape");
+  await ctx.close();
+});

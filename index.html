@@ -535,7 +535,7 @@ function durLabel(m){return String(m/60).replace(".",",")+" jam"}
 /* salinan dari lib/schedule.js (klien tidak bisa require) */
 function fairSummary(n,M){var slots=4*M,min=Math.floor(slots/n),extra=slots%n;return {min:min,max:extra?min+1:min,extra:extra,equal:extra===0}}
 function gcd(a,b){return b?gcd(b,a%b):a}
-function fairSuggest(n,M){var step=n/gcd(n,4);if(M%step===0)return {down:null,up:null};var d=Math.floor(M/step)*step,u=d+step;return {down:d>=1?d:null,up:u<=30?u:null}}
+function fairSuggest(n,M,max){var step=n/gcd(n,4);if(M%step===0)return {down:null,up:null};var d=Math.floor(M/step)*step,u=d+step;return {down:d>=1?d:null,up:u<=max?u:null}}
 function renderSessBar(){
   $("sessbar").innerHTML=btn('variant="secondary" data-act="wznew"','+ Sesi baru');
 }
@@ -612,7 +612,7 @@ function wz3(){
       else{
         var fewer=wz.players.filter(function(_,i){return counts[i]===mn});
         h+='<s-text>Tiap pemain main '+mn+'–'+mx+' game.</s-text><s-text color="subdued">Main '+mn+' game: '+esc(fewer.join(", "))+'</s-text>';
-        var sg=fairSuggest(n,M);
+        var sg=fairSuggest(n,M,Math.min(30,Math.floor(720/slot)));
         if(sg.down)h+=btn('variant="secondary" data-act="wzsug" data-m="'+sg.down+'"','Kurangi jadi '+sg.down+' match (tiap orang '+(4*sg.down/n)+' game)');
         if(sg.up)h+=btn('variant="secondary" data-act="wzsug" data-m="'+sg.up+'"','Tambah jadi '+sg.up+' match (tiap orang '+(4*sg.up/n)+' game)');
       }
