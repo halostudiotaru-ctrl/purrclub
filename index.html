@@ -17,6 +17,7 @@ header{padding:22px 0 12px}
 .sub{margin:8px 0 0;color:var(--muted);font-size:14.5px}
 #chip{margin-top:12px;display:flex;align-items:center;flex-wrap:wrap;gap:10px}
 .rules{display:block;margin-top:14px}
+.sessbar{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
 .chip{display:inline-flex;align-items:center;min-block-size:44px;padding:5px 16px 5px 5px;border:1px solid var(--line);border-radius:999px;background:var(--surface);cursor:pointer}
 .tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;gap:8px;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line)}
 .tabs>[data-tab]{flex:1;min-inline-size:0}
@@ -154,6 +155,9 @@ section.on{display:block}
 .me-n{text-decoration:underline;text-decoration-color:var(--pumpkin);text-underline-offset:3px}
 s-banner.gap{display:block;margin-bottom:16px}
 s-stack.toolbar{display:flex;flex-wrap:wrap;margin-bottom:16px}
+s-stack.sesscard{display:flex;margin-bottom:12px}
+.cnt{display:block;flex-basis:100%;line-height:16px;margin-top:-4px;margin-bottom:-12px;font-size:12.5px;font-weight:500;color:var(--muted)}
+@media (min-width:490px){#klasemen .cnt{display:none}}
 .matches{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
 @media (min-width:700px){.matches{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .match{display:block;border-radius:16px}
@@ -213,10 +217,11 @@ s-stack.toolbar{display:flex;flex-wrap:wrap;margin-bottom:16px}
 <script>window.addEventListener("load",function(){if(!customElements.get("s-button"))document.getElementById("nopolaris").hidden=false})</script>
 <div class="wrap">
 <header>
-  <h1 class="title">Halloween Tennis</h1>
-  <p class="sub">Sabtu, 24 Okt · 17:00–22:00 · <s-link href="https://maps.app.goo.gl/8W14SVu49JueAfwQA?g_st=ic" target="_blank">Medco Ampera</s-link></p>
+  <h1 class="title" id="sTitle">Halloween Tennis</h1>
+  <p class="sub" id="sSub">Sabtu, 24 Okt · 17:00–22:00 · <s-link href="https://maps.app.goo.gl/8W14SVu49JueAfwQA?g_st=ic" target="_blank">Medco Ampera</s-link></p>
   <div id="chip"></div>
-  <s-banner class="rules" tone="info" heading="Aturan">
+  <div id="sessbar" class="sessbar"></div>
+  <s-banner class="rules" id="rules" tone="info" heading="Aturan">
     Doubles, partner berganti tiap match. Satu match sampai <b>4 game</b>. Setiap game: 15–30–40, <b>deuce hanya 1 kali</b>, deuce kedua jadi <b>sudden death</b> (poin berikutnya menang). 10 match × 30 menit di 1 lapangan, tiap orang main <b>4 kali</b>. Game manual dan pergantian pemain bisa ditambah di tab Jadwal.
   </s-banner>
 </header>
@@ -248,6 +253,9 @@ var BASE="https://claude.ai/artifact/UFPGpWiytzJERZ9XPK2Xsf";
 var FIXED=[1,2,9,7,0,8,6,3,7,2,4,5,1,6,3,9,0,5,8,4,7,3,9,6,2,5,0,1,7,4,8,9,6,0,5,1,8,3,4,2];
 var state=null,me={p:null,photo:null,name:null},photos={},photoVer={},pending=null,recapBlob=null,recapName="recap.png",toastT=null;
 var rev=0,inflight=0,online=null,uploadingFor=null;
+var pullSeq=0,appliedSeq=0;
+var viewSid=null,quiet=false,synced=false,hdrKey=null,wz=null,LEGACY_ID="halloween";
+var HEAD0={title:$("sTitle").innerHTML,sub:$("sSub").innerHTML,rules:$("rules").innerHTML,doc:document.title};
 
 /* ---------- util ---------- */
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -278,14 +286,22 @@ function toast(t){
   toastT=setTimeout(function(){toastOn=false;hideToastEl()},2800);
 }
 function btn(attrs,label){return '<s-button '+attrs+'><span class="tap">'+label+'</span></s-button>'}
-function slotTime(i){var mins=17*60+i*30;function f(x){var h=Math.floor(x/60),mi=x%60;return (h<10?"0":"")+h+":"+(mi<10?"0":"")+mi}return f(mins)+"–"+f(mins+30)}
+function hm(m){m=((m%1440)+1440)%1440;var h=Math.floor(m/60),mi=m%60;return (h<10?"0":"")+h+":"+(mi<10?"0":"")+mi}
+function sess(){return (state&&state.session)||null}
+function cfg(){var s=sess();return s&&s.config?s.config:{startTime:"17:00",slotMin:30,durationMin:300}}
+function startMin(c){var p=String(c.startTime).split(":");return (+p[0])*60+(+p[1])}
+function slotTime(i){var c=cfg(),s=startMin(c)+i*c.slotMin;return hm(s)+"–"+hm(s+c.slotMin)}
+function isLegacy(){return !state.sid||state.sid===LEGACY_ID}
+function isRO(){var s=sess();return !!(s&&s.readOnly)}
+function meIdx(){if(!isRO())return me.p;if(!me.name)return null;var k=PLAYERS.indexOf(me.name);return k>=0?k:null}
+function sidQ(sep){return state&&state.sid?sep+"sid="+encodeURIComponent(state.sid):""}
 function freshMatch(f){return {a:[f[0],f[1]],b:[f[2],f[3]],manual:false,games:[0,0],p:[0,0],adv:null,deuceN:0,sudden:false,done:false,hn:0}}
 function fixedSchedule(){var ms=[];for(var m=0;m<DEFAULT_M;m++)ms.push(freshMatch(FIXED.slice(m*4,m*4+4)));return {players:DEFAULT_PLAYERS.slice(),cur:null,matches:ms}}
 function matchLabel(m,i){return m.manual?"Game manual":slotTime(i)}
 
 /* ---------- penyimpanan ---------- */
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
-function load(){try{var r=localStorage.getItem(KEY);if(r){var s=JSON.parse(r);if(s&&s.matches&&s.matches.length>=1){if(!Array.isArray(s.players))s.players=DEFAULT_PLAYERS.slice();return s}}}catch(e){}return null}
+function load(){try{var r=localStorage.getItem(KEY);if(r){var s=JSON.parse(r);if(s&&s.session&&s.session.readOnly)return null;if(s&&s.matches&&s.matches.length>=1){if(!Array.isArray(s.players))s.players=DEFAULT_PLAYERS.slice();return s}}}catch(e){}return null}
 function saveMe(){try{localStorage.setItem(MEKEY,JSON.stringify(me))}catch(e){}}
 function loadMe(){try{var r=localStorage.getItem(MEKEY);if(r){var o=JSON.parse(r);if(o&&typeof o==="object")return {p:(typeof o.p==="number"?o.p:null),photo:o.photo||null,name:(typeof o.name==="string"?o.name:null)}}}catch(e){}return {p:null,photo:null,name:null}}
 
@@ -298,11 +314,18 @@ function api(path,opt){
 function setOnline(v){if(online===v)return;online=v;var e=$("sync");if(e)e.textContent=v===null?"":(v?"● Live":"● Offline, coba lagi otomatis")}
 function fixMe(){
   if(me.p===null)return false;
-  if(me.p>=PLAYERS.length||(me.name&&PLAYERS[me.p]!==me.name)){me.p=null;me.photo=null;me.name=null;saveMe();return true}
+  if(me.p>=PLAYERS.length||(me.name&&PLAYERS[me.p]!==me.name)){
+    var k=me.name?PLAYERS.indexOf(me.name):-1;
+    if(k>=0){me.p=k;saveMe();return false}
+    me.p=null;me.photo=null;me.name=null;saveMe();return true;
+  }
   if(!me.name){me.name=PLAYERS[me.p];saveMe()}
   return false;
 }
 function adopt(r){
+  var prev=state.sid||null,isNew=!!(r.sid&&r.sid!==prev),switched=!!(isNew&&prev);
+  if(isNew){photos={};photoVer={};rev=0;subCtx=null;gameCtx=null;wz=null}
+  state.sid=r.sid||null;state.active=r.active||null;state.session=r.session||null;state.suggest=r.suggest||null;
   state.cur=typeof r.cur==="number"?r.cur:null;
   if(Array.isArray(r.players))state.players=r.players;
   PLAYERS=state.players;
@@ -310,13 +333,24 @@ function adopt(r){
     var old=state.matches[i]||{};
     return {a:m.a||old.a||[0,1],b:m.b||old.b||[2,3],manual:!!m.manual,games:m.games,p:m.p,adv:m.adv,deuceN:m.deuceN,sudden:m.sudden,done:m.done,hn:m.hn||0};
   });
-  if(fixMe()&&!modalIsOpen())pickPlayer();
-  try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+  var announce=switched&&synced&&!quiet;
+  if(announce){if(modalIsOpen())closeModal();toast("Sesi aktif: "+((r.session&&r.session.name)||""))}
+  if(switched)quiet=false;
+  if(!isRO()&&fixMe()){
+    if(announce)setTimeout(function(){if(!modalIsOpen())pickPlayer()},350);
+    else if(!modalIsOpen())pickPlayer();
+  }
+  if(isNew&&!isRO()&&me.photo&&me.p!==null)photos[me.p]=me.photo;
+  synced=true;
+  if(r.sid&&r.sid===r.active)viewSid=null;
+  if(!isRO()){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 }
 function sendOp(body){
+  if(isRO()){toast("Sesi lama hanya bisa dilihat");return Promise.resolve(false)}
   inflight++;
-  return api("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
-    .then(function(r){setOnline(true);inflight--;if(inflight===0){adopt(r);rev=r.rev;render()}return true})
+  var sentSid=state.sid;
+  return api("/api/state"+sidQ("?"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+    .then(function(r){setOnline(true);inflight--;if(inflight===0&&state.sid===sentSid){adopt(r);rev=r.rev;render()}return true})
     .catch(function(e){
       inflight--;
       if(e.status&&e.status<500){toast(e.message)}else{setOnline(false);toast("Gagal kirim skor, cek koneksi")}
@@ -325,16 +359,19 @@ function sendOp(body){
     });
 }
 function pull(force){
-  return api("/api/state").then(function(s){
+  var seq=++pullSeq,want=viewSid;
+  return api("/api/state"+(viewSid?"?sid="+encodeURIComponent(viewSid):"")).then(function(s){
+    if(want!==viewSid||seq<appliedSeq)return;
+    appliedSeq=seq;
     setOnline(true);
     var changed=false;
-    if(s.matches&&(inflight===0||force)&&s.rev!==rev){adopt(s);rev=s.rev;changed=true}
+    if(s.matches&&(inflight===0||force)&&(s.rev!==rev||(s.sid||null)!==(state.sid||null)||!!(s.session&&s.session.readOnly)!==!!(state.session&&state.session.readOnly))){adopt(s);rev=s.rev;changed=true}
     var jobs=[];
     Object.keys(s.photos||{}).forEach(function(k){
       var p=+k;
       if(photoVer[p]!==s.photos[k]){
         photoVer[p]=s.photos[k];
-        jobs.push(api("/api/photo?p="+p).then(function(r){if(r.photo){photos[p]=r.photo;changed=true}}).catch(function(){photoVer[p]=null}));
+        jobs.push(api("/api/photo?p="+p+sidQ("&")).then(function(r){if(r.photo){photos[p]=r.photo;changed=true}}).catch(function(){photoVer[p]=null}));
       }
     });
     if(s.photos){
@@ -345,14 +382,17 @@ function pull(force){
       });
     }
     return Promise.all(jobs).then(function(){
-      if(me.p!==null&&me.photo&&!(s.photos&&s.photos[me.p]))uploadPhoto(me.p,me.photo);
+      if(me.p!==null&&me.photo&&!isRO()&&!(s.photos&&s.photos[me.p]))uploadPhoto(me.p,me.photo);
       if(changed)render();
     });
-  }).catch(function(){setOnline(false)});
+  }).catch(function(e){
+    if(e&&e.status===404&&viewSid){viewSid=null;quiet=true;return pull(true)}
+    setOnline(false);
+  });
 }
 function uploadPhoto(p,data){
   if(uploadingFor===p)return;uploadingFor=p;
-  return api("/api/photo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({p:p,photo:data})})
+  return api("/api/photo"+sidQ("?"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({p:p,photo:data})})
     .then(function(r){photoVer[p]=r.v;toast("Foto terkirim ke semua orang")})
     .catch(function(){toast("Foto tersimpan di HP, belum terkirim")})
     .then(function(){uploadingFor=null});
@@ -379,8 +419,8 @@ function applyPoint(m,s){
 }
 function curIdx(){var i=firstOpen();return i<0?state.matches.length:i}
 function inMatch(i,p){var m=state.matches[i];return p!==null&&m.a.concat(m.b).indexOf(p)>=0}
-function canScore(i){return i===curIdx()&&!state.matches[i].done}
-function canAct(i){var m=state.matches[i];return i===curIdx()||m.done||(m.hn||0)>0}
+function canScore(i){return !isRO()&&i===curIdx()&&!state.matches[i].done}
+function canAct(i){var m=state.matches[i];return !isRO()&&(i===curIdx()||m.done||(m.hn||0)>0)}
 function setCurrent(i){var m=state.matches[i];if(m.done||i===curIdx())return;state.cur=i;render();sendOp({op:"setcurrent",i:i,p:me.p}).then(function(ok){if(ok)toast("Match "+(i+1)+" sedang main")})}
 function addPoint(i,s){
   if(!canScore(i))return;
@@ -418,7 +458,7 @@ function openModal(heading,bodyHtml,opts){
 function closeModal(){modal.hideOverlay()}
 modal.addEventListener("hide",function(){
   subCtx=null;
-  gameCtx=null;
+  gameCtx=null;wz=null;
   if(toastEl.parentNode===modal){document.body.appendChild(toastEl);if(toastOn)showToastEl()}
   if(pending){var p=pending;pending=null;p(false)}
 });
@@ -443,8 +483,9 @@ function avatar(p,size){
   return '<s-avatar'+src+' initials="'+esc(PLAYERS[p].charAt(0))+'" alt="'+esc(PLAYERS[p])+'" size="'+avatarSize(size)+'"></s-avatar>';
 }
 function renderChip(){
-  var h;
-  if(me.p===null)h=btn('variant="primary" data-act="pick"','Pilih namamu');
+  var h,mi=meIdx();
+  if(mi===null)h=isRO()?'':btn('variant="primary" data-act="pick"','Pilih namamu');
+  else if(isRO())h='<s-stack class="chip" direction="inline" alignItems="center" gap="small">'+avatar(mi,34)+'<s-text type="strong">Kamu: '+esc(PLAYERS[mi])+'</s-text></s-stack>';
   else h='<s-clickable class="chip" data-act="profile" accessibilityLabel="Profil '+esc(PLAYERS[me.p])+'"><s-stack direction="inline" alignItems="center" gap="small">'+avatar(me.p,34)+'<s-text type="strong">Kamu: '+esc(PLAYERS[me.p])+'</s-text></s-stack></s-clickable>';
   h+='<s-text id="sync" color="subdued"></s-text>';
   $("chip").innerHTML=h;
@@ -484,18 +525,165 @@ function gameModal(){
   openModal("Game manual",'<div id="gameBody"></div>',{secondary:{act:"close",label:"Batal"},primary:{act:"gamego",label:"Mulai game"}});
   paintGame();
 }
+function suggestIds(){
+  var g=state.suggest;
+  if(!g||!g.a||!g.b)return [];
+  var ids=g.a.concat(g.b);
+  return ids.every(function(p){return Number.isInteger(p)&&p>=0&&p<PLAYERS.length})?ids:[];
+}
+function gameBtn(p,sel,rec,r){
+  return '<s-clickable class="pickItem'+(sel?' sel':'')+'" data-act="gametoggle" data-p="'+p+'" accessibilityLabel="'+esc(PLAYERS[p])+'"><s-stack direction="inline" alignItems="center" gap="small">'+avatar(p,32)+'<s-stack gap="small-200"><s-text type="strong">'+esc(PLAYERS[p])+'</s-text><s-text color="subdued">main '+r.played+'/'+r.sched+'</s-text></s-stack>'+(rec?'<s-badge tone="info">Disarankan</s-badge>':'')+'</s-stack></s-clickable>';
+}
 function paintGame(){
   var box=$("gameBody");if(!box||!gameCtx)return;
   var keep=($("gpIn")||{}).value||"";
   var sel=gameCtx.sel=gameCtx.sel.filter(function(p){return p<PLAYERS.length});
+  var rec=suggestIds(),st=stats();
+  var order=rec.concat(st.slice().sort(function(a,b){return a.sched-b.sched||a.played-b.played||a.i-b.i}).map(function(r){return r.i}).filter(function(p){return rec.indexOf(p)<0}));
   function nameAt(k){return sel[k]!==undefined?PLAYERS[sel[k]]:"…"}
   var h='<s-stack gap="base"><s-paragraph color="subdued">Pilih 4 pemain. Dua yang pertama jadi Tim A, dua berikutnya Tim B. Ketuk lagi untuk batal.</s-paragraph>';
+  if(rec.length===4)h+='<s-stack direction="inline" gap="small" alignItems="center">'+btn('variant="secondary" data-act="gamesuggest"','Pakai saran')+'<s-text color="subdued">Pemain dengan jumlah main paling sedikit</s-text></s-stack>';
   h+='<s-text type="strong">Tim A: '+esc(nameAt(0)+" & "+nameAt(1))+'</s-text><s-text type="strong">Tim B: '+esc(nameAt(2)+" & "+nameAt(3))+'</s-text><div class="pick">';
-  PLAYERS.forEach(function(n,p){h+=pickBtn('data-act="gametoggle" data-p="'+p+'"',p,sel.indexOf(p)>=0)});
+  order.forEach(function(p){h+=gameBtn(p,sel.indexOf(p)>=0,rec.indexOf(p)>=0,st[p])});
   h+='</div><s-stack direction="inline" gap="small" alignItems="end"><s-text-field id="gpIn" label="Pemain baru" placeholder="Nama" maxlength="20" autocomplete="off"></s-text-field>'+btn('variant="secondary" data-act="gameaddplayer"','Tambah')+'</s-stack></s-stack>';
   box.innerHTML=h;
   var f=$("gpIn");if(f)f.value=keep;
   var go=modal.querySelector('[data-act="gamego"]');if(go)go.toggleAttribute("disabled",sel.length!==4);
+}
+/* ---------- sesi baru ---------- */
+var MON=["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"],DAY=["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+function dateNote(d){return DAY[d.getDay()]+" "+d.getDate()+" "+MON[d.getMonth()]}
+function defaultStart(){var d=new Date();return hm(Math.ceil((d.getHours()*60+d.getMinutes())/5)*5)}
+function durLabel(m){return String(m/60).replace(".",",")+" jam"}
+/* salinan dari lib/schedule.js (klien tidak bisa require) */
+function fairSummary(n,M){var slots=4*M,min=Math.floor(slots/n),extra=slots%n;return {min:min,max:extra?min+1:min,extra:extra,equal:extra===0}}
+function gcd(a,b){return b?gcd(b,a%b):a}
+function fairSuggest(n,M,max){var step=n/gcd(n,4);if(M%step===0)return {down:null,up:null};var d=Math.floor(M/step)*step,u=d+step;return {down:d>=1?d:null,up:u<=max?u:null}}
+function renderSessBar(){
+  $("sessbar").innerHTML=btn('variant="secondary" data-act="wznew"','+ Sesi baru')+btn('variant="secondary" data-act="hist"','Riwayat');
+}
+function wzOpen(){
+  var d=new Date();
+  wz={step:1,name:"Mabar "+d.getDate()+" "+MON[d.getMonth()],dur:"180",slot:"30",start:defaultStart(),players:[],copyFrom:null,sessions:null,preview:null,busy:false};
+  api("/api/sessions").then(function(r){if(wz){wz.sessions=r.sessions;if(wz.step===2)wz2()}}).catch(function(){});
+  wzShow();
+}
+function wzShow(){
+  if(!wz)return;
+  if(wz.step===1)wz1();else if(wz.step===2)wz2();else if(wz.step==="copy")wzCopy();else wz3();
+}
+function wz1(){
+  var quick=[60,90,120,150,180].map(function(m){return btn('variant="secondary" data-act="wzdur" data-min="'+m+'"',durLabel(m))}).join("");
+  openModal("Sesi baru · 1/3",
+    '<s-stack gap="base"><s-text-field id="wzName" label="Nama sesi" maxlength="40" autocomplete="off"></s-text-field>'
+    +'<s-text-field id="wzDur" label="Durasi (menit)" autocomplete="off"></s-text-field>'
+    +'<s-stack direction="inline" gap="small">'+quick+'</s-stack>'
+    +'<s-text-field id="wzSlot" label="Menit per match" autocomplete="off"></s-text-field>'
+    +'<s-text-field id="wzStart" label="Jam mulai (HH:MM)" placeholder="19:00" autocomplete="off"></s-text-field></s-stack>',
+    {secondary:{act:"close",label:"Batal"},primary:{act:"wznext",label:"Lanjut"}});
+  $("wzName").value=wz.name;$("wzDur").value=wz.dur;$("wzSlot").value=wz.slot;$("wzStart").value=wz.start;
+}
+function wzRead1(){wz.name=readName("wzName");wz.dur=readName("wzDur");wz.slot=readName("wzSlot");wz.start=readName("wzStart")}
+function wzErr1(){
+  var dur=+wz.dur,slot=+wz.slot;
+  if(!wz.name)return "Isi nama sesi dulu";
+  if(!(Number.isInteger(dur)&&dur>=10&&dur<=720))return "Durasi harus 10-720 menit";
+  if(!(Number.isInteger(slot)&&slot>=10&&slot<=120))return "Menit per match harus 10-120";
+  if(!/^([01]?\d|2[0-3]):[0-5]\d$/.test(wz.start))return "Jam mulai harus berformat HH:MM";
+  return "";
+}
+function wzAddName(n,silent){
+  n=String(n).trim().replace(/\s+/g," ");
+  if(!n||n.length>20){if(!silent)toast("Nama harus 1-20 karakter");return false}
+  if(wz.players.length>=20){if(!silent)toast("Maksimal 20 pemain");return false}
+  if(wz.players.some(function(x){return x.toLowerCase()===n.toLowerCase()})){if(!silent)toast("Nama sudah ada");return false}
+  wz.players.push(n);return true;
+}
+function wz2(){
+  var chips=wz.players.map(function(n,i){return '<s-clickable class="pickItem" data-act="wzrm" data-i="'+i+'" accessibilityLabel="Hapus '+esc(n)+'"><s-stack direction="inline" alignItems="center" justifyContent="space-between" gap="small"><s-text type="strong">'+esc(n)+'</s-text><s-text color="subdued">✕</s-text></s-stack></s-clickable>'}).join("");
+  var copy=wz.sessions&&wz.sessions.length?btn('variant="secondary" data-act="wzcopy"','Ambil dari sesi sebelumnya'):'';
+  openModal("Sesi baru · 2/3",
+    '<s-stack gap="base"><s-paragraph color="subdued">'+wz.players.length+' pemain (minimal 4, maksimal 20). Ketuk nama untuk menghapus.</s-paragraph>'
+    +'<s-stack direction="inline" gap="small" alignItems="end"><s-text-field id="wzPn" label="Nama pemain" placeholder="Nama" maxlength="20" autocomplete="off"></s-text-field>'+btn('variant="secondary" data-act="wzadd"','Tambah')+'</s-stack>'
+    +copy+'<div class="pick">'+chips+'</div></s-stack>',
+    {secondary:{act:"wzback",label:"Kembali"},primary:{act:"wznext",label:"Lanjut"}});
+}
+function wzCopy(){
+  var rows=wz.sessions.map(function(s){return '<s-clickable class="pickItem" data-act="wzcopyfrom" data-id="'+esc(s.id)+'" accessibilityLabel="'+esc(s.name)+'"><s-stack gap="small-200"><s-text type="strong">'+esc(s.name)+'</s-text><s-text color="subdued">'+s.playerCount+' pemain</s-text></s-stack></s-clickable>'}).join("");
+  openModal("Ambil dari sesi",'<s-stack gap="small">'+rows+'</s-stack>',{secondary:{act:"wzback",label:"Kembali"}});
+}
+function wzCopyFrom(id){
+  var s=(wz.sessions||[]).filter(function(x){return x.id===id})[0];
+  if(!s)return;
+  (s.players||[]).forEach(function(n){wzAddName(n,true)});
+  wz.copyFrom=id;wz.step=2;wz2();
+}
+function wz3(){
+  var n=wz.players.length,slot=+wz.slot,dur=+wz.dur,M=Math.floor(dur/slot);
+  var bad=M<1?"Durasi lebih pendek dari satu match":M>30?"Maksimal 30 match, kurangi durasi":"";
+  var key=wz.players.join("|")+"/"+M+"/"+wz.name;
+  var h='<s-stack gap="base">',ready=false;
+  if(bad){h+='<s-banner tone="critical">'+esc(bad)+'</s-banner>'}
+  else if(wz.preview&&wz.preview.key===key){
+    if(wz.preview.error){h+='<s-banner tone="critical">'+esc(wz.preview.error)+'</s-banner>'}
+    else{
+      var counts=Array(n).fill(0);
+      wz.preview.matches.forEach(function(m){m.a.concat(m.b).forEach(function(p){counts[p]++})});
+      var mn=Math.min.apply(null,counts),mx=Math.max.apply(null,counts),s0=startMin({startTime:wz.start});
+      h+='<s-text type="strong">'+n+' pemain · '+M+' match · '+hm(s0)+'–'+hm(s0+dur)+'</s-text>';
+      if(mn===mx)h+='<s-text>Semua pemain main '+mn+' game.</s-text>';
+      else{
+        var fewer=wz.players.filter(function(_,i){return counts[i]===mn});
+        h+='<s-text>Tiap pemain main '+mn+'–'+mx+' game.</s-text><s-text color="subdued">Main '+mn+' game: '+esc(fewer.join(", "))+'</s-text>';
+        var sg=fairSuggest(n,M,Math.min(30,Math.floor(720/slot)));
+        if(sg.down)h+=btn('variant="secondary" data-act="wzsug" data-m="'+sg.down+'"','Kurangi jadi '+sg.down+' match (tiap orang '+(4*sg.down/n)+' game)');
+        if(sg.up)h+=btn('variant="secondary" data-act="wzsug" data-m="'+sg.up+'"','Tambah jadi '+sg.up+' match (tiap orang '+(4*sg.up/n)+' game)');
+      }
+      ready=true;
+    }
+  }else{
+    h+='<s-text color="subdued">Menghitung jadwal…</s-text>';
+    api("/api/sessions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({op:"preview",name:wz.name,players:wz.players,durationMin:dur,slotMin:slot,startTime:wz.start})})
+      .then(function(r){if(wz&&wz.step===3){wz.preview={key:key,matches:r.matches};wz3()}})
+      .catch(function(e){if(wz&&wz.step===3){wz.preview={key:key,error:e.message};wz3()}});
+  }
+  openModal("Sesi baru · 3/3",h+'</s-stack>',{secondary:{act:"wzback",label:"Kembali"},primary:{act:"wzgo",label:"Mulai sesi"}});
+  var go=modal.querySelector('[data-act="wzgo"]');if(go)go.toggleAttribute("disabled",!ready);
+}
+function wzNext(){
+  if(wz.step===1){
+    wzRead1();var e=wzErr1();if(e){toast(e);return}
+    wz.start=("0"+wz.start).slice(-5);wz.step=2;wz2();
+  }else if(wz.step===2){
+    var t=readName("wzPn");if(t)wzAddName(t);
+    if(wz.players.length<4){toast("Minimal 4 pemain");wz2();return}
+    wz.step=3;wz.preview=null;wz3();
+  }
+}
+function wzGo(){
+  if(!wz||wz.busy)return;
+  var body={name:wz.name,players:wz.players.slice(),durationMin:+wz.dur,slotMin:+wz.slot,startTime:wz.start,note:dateNote(new Date())};
+  if(wz.copyFrom)body.copyFrom=wz.copyFrom;
+  wz.busy=true;
+  api("/api/sessions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+    .then(function(){closeModal();viewSid=null;pull(true)})
+    .catch(function(e){if(wz)wz.busy=false;toast(e.message)});
+}
+var histActive=null;
+function histModal(){
+  openModal("Riwayat sesi",'<div id="histBody"><s-text color="subdued">Memuat…</s-text></div>',{secondary:{act:"close",label:"Tutup"}});
+  api("/api/sessions").then(function(r){
+    var box=$("histBody");if(!box)return;
+    histActive=r.active;
+    var rows=r.sessions.map(function(s){
+      var shown=viewSid?s.id===viewSid:s.id===r.active;
+      return '<s-clickable class="pickItem'+(shown?' sel':'')+'" data-act="histopen" data-id="'+esc(s.id)+'" accessibilityLabel="'+esc(s.name)+'"><s-stack gap="small-200"><s-stack direction="inline" alignItems="center" gap="small"><s-text type="strong">'+esc(s.name)+'</s-text>'+(s.id===r.active?'<s-badge tone="success">Aktif</s-badge>':'')+'</s-stack><s-text color="subdued">'+esc((s.note?s.note+" · ":"")+s.playerCount+" pemain · "+s.doneCount+"/"+s.matchCount+" match")+'</s-text></s-stack></s-clickable>';
+    }).join("");
+    box.innerHTML='<s-stack gap="small">'+rows+'</s-stack>';
+  }).catch(function(){var box=$("histBody");if(box)box.innerHTML='<s-text color="subdued">Gagal memuat riwayat. Coba lagi.</s-text>'});
+}
+function roBar(){
+  return '<s-stack class="toolbar" direction="inline" gap="small">'+btn('variant="primary" data-act="histback"','Kembali ke sesi aktif')+btn('variant="secondary" data-act="histactivate"','Jadikan aktif')+'</s-stack>';
 }
 function selfieStep(){
   var h='<s-stack alignItems="center" gap="base">'+avatar(me.p,140)+'<s-paragraph color="subdued">Foto dipakai di kartu recap dan tersimpan di HP ini saja.</s-paragraph></s-stack>';
@@ -577,19 +765,34 @@ function titleFor(d){
 
 /* ---------- tampilan ---------- */
 function banner(){
+  if(isRO())return '<s-banner class="gap" tone="warning" heading="Sesi lama">Kamu sedang melihat sesi ini hanya-lihat. Skor tidak bisa diubah.</s-banner>';
   var c=firstOpen();
   if(c<0)return '';
   return '<s-banner class="gap" tone="info" heading="Match '+(c+1)+' sedang main">Siapa saja bisa mencatat poin di kartu bertanda ungu. Skor tampil live di semua HP.</s-banner>';
 }
 function firstOpen(){var n=state.matches.length,c=state.cur;if(typeof c==="number"&&c>=0&&c<n&&!state.matches[c].done)return c;for(var i=0;i<n;i++)if(!state.matches[i].done)return i;return -1}
-function nm(p){return p===me.p?'<span class="me-n">'+esc(PLAYERS[p])+'</span>':esc(PLAYERS[p])}
+function nm(p){return p===meIdx()?'<span class="me-n">'+esc(PLAYERS[p])+'</span>':esc(PLAYERS[p])}
 
 function teamHtml(t,win){
   var tone=win?' tone="success"':'';
   return '<s-stack alignItems="center" gap="small-200"><s-text type="strong"'+tone+'>'+nm(t[0])+'</s-text><s-text type="strong"'+tone+'>'+nm(t[1])+'</s-text></s-stack>';
 }
+function fairLine(){
+  var c={};
+  stats().forEach(function(r){c[r.sched]=(c[r.sched]||0)+1});
+  var ks=Object.keys(c).map(Number).sort(function(a,b){return a-b});
+  if(ks.length===1)return "Tiap pemain main "+ks[0]+" game";
+  return ks.map(function(k){return c[k]+" orang main "+k+" kali"}).join(", ");
+}
+function sessionCard(){
+  if(!state.matches.length)return '';
+  var st=stats(),sc=st.map(function(r){return r.sched}),mn=Math.min.apply(null,sc),mx=Math.max.apply(null,sc);
+  var h='<s-stack class="sesscard" gap="small-200"><s-text type="strong">'+esc(fairLine())+'</s-text><s-text color="subdued">'+PLAYERS.length+' pemain · '+state.matches.length+' match</s-text>';
+  if(mn<mx)h+='<s-text color="subdued">Paling sedikit ('+mn+' game): '+esc(st.filter(function(r){return r.sched===mn}).map(function(r){return r.name}).join(", "))+'</s-text>';
+  return h+'</s-stack>';
+}
 function renderJadwal(){
-  var cur=firstOpen(),h=banner()+'<s-stack class="toolbar" direction="inline" gap="small">'+btn('variant="secondary" data-act="addgame"','+ Game manual')+btn('variant="secondary" data-act="addplayer"','+ Pemain baru')+'</s-stack><div class="matches">';
+  var cur=firstOpen(),h=sessionCard()+banner()+(isRO()?roBar():'<s-stack class="toolbar" direction="inline" gap="small">'+btn('variant="secondary" data-act="addgame"','+ Game manual')+btn('variant="secondary" data-act="addplayer"','+ Pemain baru')+'</s-stack>')+'<div class="matches">';
   state.matches.forEach(function(m,i){
     var players=m.a.concat(m.b);
     var rest=PLAYERS.map(function(_,k){return k}).filter(function(k){return players.indexOf(k)<0});
@@ -618,7 +821,7 @@ function renderJadwal(){
       if(started||m.done)mini+=btn('variant="secondary" data-reset="'+i+'"','Reset match');
       if(mini)h+='<s-stack direction="inline" gap="small">'+mini+'</s-stack>';
     }
-    if(!m.done){
+    if(!m.done&&!isRO()){
       var mgmt=btn('variant="secondary" data-sub="'+i+'"','Ganti pemain');
       if(!live)mgmt+=btn('variant="secondary" data-setcur="'+i+'"','Jadikan sedang main');
       h+='<s-stack direction="inline" gap="small">'+mgmt+'</s-stack>';
@@ -630,17 +833,18 @@ function renderJadwal(){
 }
 function renderKlasemen(){
   var s=ranked(),h=banner()+'<div class="kl"><aside class="kl-side">';
-  if(me.p!==null){
-    var mine=s.filter(function(r){return r.i===me.p})[0];
-    h+='<s-section><s-stack direction="inline" alignItems="center" gap="base">'+avatar(me.p,64)+'<s-stack gap="small-200"><s-heading>Recap '+esc(PLAYERS[me.p])+'</s-heading><s-text color="subdued">'+(mine.played?mine.played+' match selesai · '+mine.w+' menang':'Muncul setelah match pertamamu selesai')+'</s-text>'+btn('variant="primary" data-act="recap" data-p="'+me.p+'"','Lihat recap-ku')+'</s-stack></s-stack></s-section>';
-  }else{
+  var mi=meIdx();
+  if(mi!==null){
+    var mine=s.filter(function(r){return r.i===mi})[0];
+    h+='<s-section><s-stack direction="inline" alignItems="center" gap="base">'+avatar(mi,64)+'<s-stack gap="small-200"><s-heading>Recap '+esc(PLAYERS[mi])+'</s-heading><s-text color="subdued">'+(mine.played?mine.played+' match selesai · '+mine.w+' menang':'Muncul setelah match pertamamu selesai')+'</s-text>'+btn('variant="primary" data-act="recap" data-p="'+mi+'"','Lihat recap-ku')+'</s-stack></s-stack></s-section>';
+  }else if(!isRO()){
     h+='<s-section><s-stack gap="small-200"><s-heading>Mau recap sendiri?</s-heading><s-text color="subdued">Pilih namamu dan ambil selfie dulu.</s-text>'+btn('variant="primary" data-act="pick"','Pilih namamu')+'</s-stack></s-section>';
   }
   h+='</aside><div class="kl-main"><s-section padding="none"><s-table>';
   h+='<s-table-header-row><s-table-header listSlot="primary">Pemain</s-table-header><s-table-header listSlot="inline" format="numeric">Main</s-table-header><s-table-header listSlot="inline" format="numeric">Menang</s-table-header><s-table-header listSlot="inline" format="numeric">Kalah</s-table-header><s-table-header listSlot="inline" format="numeric">Game</s-table-header><s-table-header listSlot="inline" format="numeric">Selisih</s-table-header><s-table-header listSlot="secondary">Recap</s-table-header></s-table-header-row><s-table-body>';
   s.forEach(function(r,idx){
     var d=r.gw-r.gl,top=(idx===0&&r.played>0);
-    var name='<span class="pn"><b'+(top?' class="topn"':'')+'>'+(idx+1)+'. '+esc(r.name)+'</b>'+(r.i===me.p?'<s-badge tone="info">kamu</s-badge>':'')+'</span>';
+    var name='<span class="pn"><b'+(top?' class="topn"':'')+'>'+(idx+1)+'. '+esc(r.name)+'</b>'+(r.i===mi?'<s-badge tone="info">kamu</s-badge>':'')+'<span class="cnt">main '+r.played+'/'+r.sched+'</span></span>';
     /* lbl: visible label in the phone list only; lo: column hidden in the phone list */
     var num=function(v,lbl,lo){return '<s-table-cell'+(lo?' class="lo"':'')+'><span class="num">'+(lbl?'<span class="lbl">'+lbl+' </span>':'')+v+'</span></s-table-cell>'};
     h+='<s-table-row><s-table-cell>'+name+'</s-table-cell>'+num(r.played+'/'+r.sched,'',1)+num(r.w,'Menang')+num(r.l,'Kalah')+num(r.gw+'–'+r.gl,'',1)+num((d>0?'+':'')+d,'Selisih')+'<s-table-cell><span class="rc">'+btn('variant="secondary" data-act="recap" data-p="'+r.i+'"','Recap')+'</span></s-table-cell></s-table-row>';
@@ -661,13 +865,26 @@ function renderPemain(){
       slots.push("Match "+(i+1)+" ("+(m.manual?"game manual":slotTime(i).split("–")[0])+")");
     });
     var ol=Object.keys(opps).map(function(k){return k+(opps[k]>1?" ×"+opps[k]:"")}).join(", ");
-    h+='<div class="pcard"><s-section heading="'+esc(n)+(p===me.p?' (kamu)':'')+'"><s-stack gap="small-200"><s-paragraph><s-text color="subdued">Main di:</s-text> '+esc(slots.join(", "))+'</s-paragraph><s-paragraph><s-text color="subdued">Partner:</s-text> '+esc(partners.join(", "))+'</s-paragraph><s-paragraph><s-text color="subdued">Lawan:</s-text> '+esc(ol)+'</s-paragraph></s-stack></s-section></div>';
+    h+='<div class="pcard"><s-section heading="'+esc(n)+(p===meIdx()?' (kamu)':'')+'"><s-stack gap="small-200"><s-paragraph><s-text color="subdued">Main di:</s-text> '+esc(slots.join(", "))+'</s-paragraph><s-paragraph><s-text color="subdued">Partner:</s-text> '+esc(partners.join(", "))+'</s-paragraph><s-paragraph><s-text color="subdued">Lawan:</s-text> '+esc(ol)+'</s-paragraph></s-stack></s-section></div>';
   });
   $("pemain").innerHTML=h+'</div>';
 }
+var RULES_NEW='Doubles, partner berganti tiap match. Satu match sampai <b>4 game</b>. Setiap game: 15–30–40, <b>deuce hanya 1 kali</b>, deuce kedua jadi <b>sudden death</b> (poin berikutnya menang). Jadwal dibuat otomatis supaya jumlah main tiap orang sama atau selisih satu. Game manual dan pergantian pemain bisa ditambah di tab Jadwal.';
+function renderHeader(){
+  var s=sess(),legacy=isLegacy();
+  var key=legacy?"legacy":state.sid+"|"+s.name+"|"+s.note+"|"+s.config.startTime+"|"+s.config.durationMin;
+  if(key===hdrKey)return;
+  hdrKey=key;
+  var t=$("sTitle"),sub=$("sSub"),ru=$("rules");
+  if(legacy){t.innerHTML=HEAD0.title;sub.innerHTML=HEAD0.sub;ru.innerHTML=HEAD0.rules;document.title=HEAD0.doc;return}
+  t.textContent=s.name;
+  sub.textContent=(s.note?s.note+" · ":"")+hm(startMin(s.config))+"–"+hm(startMin(s.config)+s.config.durationMin);
+  ru.innerHTML=RULES_NEW;
+  document.title=s.name;
+}
 function render(){
-  renderChip();renderJadwal();renderKlasemen();renderPemain();
-  $("tools").innerHTML=btn('variant="secondary" tone="critical" data-act="resetall"','Hapus semua skor');
+  renderHeader();renderSessBar();renderChip();renderJadwal();renderKlasemen();renderPemain();
+  $("tools").innerHTML=isRO()?'':btn('variant="secondary" tone="critical" data-act="resetall"','Hapus semua skor');
 }
 
 /* ---------- kartu recap (1080 x 1920, ukuran story) ---------- */
@@ -675,6 +892,9 @@ function rr(x,px,py,w,h,r){x.beginPath();x.moveTo(px+r,py);x.arcTo(px+w,py,px+w,
 function fit(x,text,maxW,size,fam,weight){var s=size;x.font=weight+" "+s+"px "+fam;while(x.measureText(text).width>maxW&&s>22){s-=2;x.font=weight+" "+s+"px "+fam}}
 function loadImg(src){return new Promise(function(res){var i=new Image();i.onload=function(){res(i)};i.onerror=function(){res(null)};i.src=src})}
 var F_DISP='"Eater","Barlow Condensed",Impact,sans-serif',F_NUM='"Barlow Condensed","Arial Narrow",Arial,sans-serif',F_TXT='"Barlow",system-ui,Arial,sans-serif';
+function recapTitle(){return isLegacy()?"Halloween Tennis":(sess().name||"Mabar")}
+function recapNote(){return isLegacy()?"Sabtu 24 Okt · Medco Ampera":(sess().note||"")}
+function slug(s){return String(s).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"recap"}
 async function drawRecap(d){
   try{if(document.fonts&&document.fonts.load){await Promise.all([document.fonts.load('80px "Eater"'),document.fonts.load('700 60px "Barlow Condensed"'),document.fonts.load('600 40px "Barlow"')])}}catch(e){}
   var c=document.createElement("canvas");c.width=1080;c.height=1920;var x=c.getContext("2d");
@@ -685,8 +905,9 @@ async function drawRecap(d){
   var seed=7;function rnd(){seed=(seed*9301+49297)%233280;return seed/233280}
   for(var i=0;i<70;i++){x.fillStyle="rgba(243,234,216,"+(0.15+rnd()*0.5)+")";x.beginPath();x.arc(rnd()*1080,rnd()*1500,1+rnd()*2.6,0,6.283);x.fill()}
   x.textAlign="center";x.textBaseline="alphabetic";
-  x.fillStyle="#ff8a1f";fit(x,"Halloween Tennis",900,92,F_DISP,"400");x.fillText("Halloween Tennis",540,290);
-  x.fillStyle="#f3ead8";x.font="600 40px "+F_TXT;x.fillText("Recap malam ini",540,345);
+  var rt=recapTitle();
+  x.fillStyle="#ff8a1f";fit(x,rt,900,92,F_DISP,"400");x.fillText(rt,540,290);
+  x.fillStyle="#f3ead8";x.font="600 40px "+F_TXT;x.fillText(isLegacy()?"Recap malam ini":"Recap sesi ini",540,345);
   var cx=540,cy=585,R=185;
   x.beginPath();x.arc(cx,cy,R+16,0,6.283);x.fillStyle="#ff8a1f";x.fill();
   var photo=photos[d.p]?await loadImg(photos[d.p]):null;
@@ -715,7 +936,7 @@ async function drawRecap(d){
     var t2="Paling mepet: "+(d.close.won?"menang ":"kalah ")+d.close.mine+"–"+d.close.th+" lawan "+PLAYERS[d.close.opp[0]]+" & "+PLAYERS[d.close.opp[1]];
     fit(x,t2,920,40,F_TXT,"600");x.fillText(t2,540,1556);
   }
-  x.fillStyle="#a898bd";x.font="500 32px "+F_TXT;x.fillText("Sabtu 24 Okt · Medco Ampera",540,1636);
+  x.fillStyle="#a898bd";x.font="500 32px "+F_TXT;x.fillText(recapNote(),540,1636);
   return c;
 }
 function openRecap(p){
@@ -725,7 +946,7 @@ function openRecap(p){
   openModal(title,'<div class="rbox" id="rbox"><s-text color="subdued">Menyiapkan gambar…</s-text></div><s-stack gap="small">'+btn('variant="primary" inlineSize="fill" data-act="sharerecap"','Bagikan ke Story')+btn('variant="secondary" inlineSize="fill" data-act="saverecap"','Simpan gambar')+btn('variant="tertiary" inlineSize="fill" data-act="close"','Tutup')+'</s-stack><s-paragraph color="subdued">Tombol bagikan membuka menu share di HP-mu. Pilih Instagram, lalu Story.</s-paragraph>',{size:"large"});
   drawRecap(d).then(function(c){
     var url=c.toDataURL("image/png");
-    c.toBlob(function(b){recapBlob=b;recapName="halloween-tennis-"+PLAYERS[p].toLowerCase()+".png"},"image/png");
+    c.toBlob(function(b){recapBlob=b;recapName=slug(recapTitle())+"-"+slug(PLAYERS[p])+".png"},"image/png");
     var box=$("rbox");if(box)box.innerHTML='<img alt="Kartu recap '+esc(PLAYERS[p])+'" src="'+url+'">';
   }).catch(function(){var box=$("rbox");if(box)box.innerHTML='<s-text color="subdued">Gambar gagal dibuat. Coba tutup dan buka lagi.</s-text>'});
 }
@@ -740,7 +961,7 @@ async function shareRecap(){
   if(!recapBlob){toast("Gambar masih disiapkan");return}
   try{
     var f=new File([recapBlob],recapName,{type:"image/png"});
-    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:"Halloween Tennis Recap"});return}
+    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:recapTitle()+" Recap"});return}
   }catch(e){if(e&&e.name==="AbortError")return}
   await saveRecap();
 }
@@ -795,6 +1016,7 @@ document.addEventListener("click",function(e){
     if(gi>=0)gameCtx.sel.splice(gi,1);else if(gameCtx.sel.length<4)gameCtx.sel.push(gp);
     paintGame();
   }
+  else if(a==="gamesuggest"&&gameCtx){var ids=suggestIds();if(ids.length===4){gameCtx.sel=ids;paintGame()}}
   else if(a==="gameaddplayer"&&gameCtx){
     var gn=readName("gpIn");
     if(!gn){toast("Isi namanya dulu");return}
@@ -805,6 +1027,31 @@ document.addEventListener("click",function(e){
     if(gs.length!==4)return;
     closeModal();
     sendOp({op:"addmatch",a:[gs[0],gs[1]],b:[gs[2],gs[3]]}).then(function(ok){if(ok)toast("Game manual ditambahkan")});
+  }
+  else if(a==="wznew"){wzOpen()}
+  else if(a==="wzdur"&&wz){var df=$("wzDur");if(df)df.value=t.dataset.min}
+  else if(a==="wznext"&&wz){wzNext()}
+  else if(a==="wzback"&&wz){wz.step=wz.step==="copy"?2:wz.step-1;wzShow()}
+  else if(a==="wzadd"&&wz){if(wzAddName(readName("wzPn")))wz2()}
+  else if(a==="wzrm"&&wz){wz.players.splice(+t.dataset.i,1);wz2()}
+  else if(a==="wzcopy"&&wz){wz.step="copy";wzShow()}
+  else if(a==="wzcopyfrom"&&wz){wzCopyFrom(t.dataset.id)}
+  else if(a==="wzsug"&&wz){wz.dur=String((+t.dataset.m)*(+wz.slot));wz.preview=null;wz3()}
+  else if(a==="wzgo"&&wz){wzGo()}
+  else if(a==="hist"){histModal()}
+  else if(a==="histopen"){
+    var hid=t.dataset.id,cur0=viewSid;
+    viewSid=(hid===histActive)?null:hid;
+    if(viewSid!==cur0){quiet=true;rev=0}
+    closeModal();pull(true);
+  }
+  else if(a==="histback"){viewSid=null;quiet=true;rev=0;pull(true)}
+  else if(a==="histactivate"&&viewSid){
+    var aid=viewSid;
+    api("/api/sessions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({op:"activate",id:aid})})
+      .then(function(){viewSid=null;rev=0;return pull(true)})
+      .then(function(){toast("Sesi diaktifkan: "+((sess()&&sess().name)||""))})
+      .catch(function(e){toast(e.message)});
   }
   else if(a==="pick"){pickPlayer()}
   else if(a==="choose"){var np=+t.dataset.p;if(np!==me.p)me.photo=null;me.p=np;me.name=PLAYERS[np];saveMe();render();selfieStep()}
@@ -820,7 +1067,7 @@ $("selfieIn").addEventListener("change",function(e){processFile(e.target.files&&
 $("galleryIn").addEventListener("change",function(e){processFile(e.target.files&&e.target.files[0])});
 document.addEventListener("keydown",function(e){
   if(e.key!=="Enter"||!e.target)return;
-  var act=e.target.id==="rstIn"?"rstok":e.target.id==="npIn"?"npok":e.target.id==="gpIn"?"gameaddplayer":null;
+  var act=e.target.id==="rstIn"?"rstok":e.target.id==="npIn"?"npok":e.target.id==="gpIn"?"gameaddplayer":e.target.id==="wzPn"?"wzadd":null;
   if(!act)return;
   e.preventDefault();document.querySelector('[data-act="'+act+'"]').click();
 });
@@ -830,11 +1077,12 @@ me=loadMe();
 if(me.photo&&me.p!==null)photos[me.p]=me.photo;
 state=load()||fixedSchedule();
 PLAYERS=state.players;
-fixMe();
+if(!isRO())fixMe();
 render();
-if(me.p===null)setTimeout(pickPlayer,350);
+if(me.p===null&&!isRO())setTimeout(pickPlayer,350);
 pull(true);
-setInterval(pull,3000);
+setInterval(function(){if(!document.hidden)pull()},3000);
+document.addEventListener("visibilitychange",function(){if(!document.hidden)pull(true)});
 })();
 </script>
 </body>
