@@ -236,3 +236,43 @@ test("writes to an old session are refused even if the controls were somehow use
   assert.equal(status, 409);
   await ctx.close();
 });
+
+test("viewing an old session never touches the stored identity or opens the name prompt", async () => {
+  const { page, ctx, errors } = await open({ routes: fakeApi() });
+  await waitLive(page);
+  const mk = (name, players) => ({ ...body, name, players });
+  const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem("halloween-tennis-me-v1")));
+  await createSession(page, mk("Sesi A", ["A1", "A2", "A3", "A4"]));
+  await titleIs(page, "Sesi A");
+  await waitModal(page, true, 4000);
+  await page.click('s-modal [data-act="choose"][data-p="0"]');
+  await page.waitForSelector('s-modal [data-act="close"]');
+  await page.click('s-modal [data-act="close"]');
+  await waitModal(page, false);
+  await createSession(page, mk("Sesi B", ["B1", "B2", "B3", "B4"]));
+  await titleIs(page, "Sesi B");
+  await waitModal(page, true, 4000);
+  await page.click('s-modal [data-act="choose"][data-p="0"]');
+  await page.waitForSelector('s-modal [data-act="close"]');
+  await page.click('s-modal [data-act="close"]');
+  await waitModal(page, false);
+  assert.equal((await stored()).name, "B1");
+
+  await page.click('[data-act="hist"]');
+  await waitModal(page, true);
+  await page.waitForSelector('s-modal [data-act="histopen"]');
+  await page.locator('s-modal [data-act="histopen"]', { hasText: "Sesi A" }).click();
+  await page.waitForFunction(() => document.getElementById("sTitle").textContent === "Sesi A" && document.querySelector("#jadwal s-banner[heading='Sesi lama']"));
+  await page.waitForTimeout(1200);
+  assert.equal(await page.locator("s-modal[open], #modal[open]").count() + (await page.evaluate(() => document.getElementById("modal").hasAttribute("open") ? 1 : 0)), 0);
+  const during = await stored();
+  assert.equal(during.name, "B1");
+  assert.notEqual(during.p, null);
+
+  await page.click('[data-act="histback"]');
+  await titleIs(page, "Sesi B");
+  await page.waitForFunction(() => document.querySelector("#chip").textContent.includes("B1"));
+  assert.equal((await stored()).name, "B1");
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});

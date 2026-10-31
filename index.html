@@ -292,6 +292,7 @@ function startMin(c){var p=String(c.startTime).split(":");return (+p[0])*60+(+p[
 function slotTime(i){var c=cfg(),s=startMin(c)+i*c.slotMin;return hm(s)+"–"+hm(s+c.slotMin)}
 function isLegacy(){return !state.sid||state.sid===LEGACY_ID}
 function isRO(){var s=sess();return !!(s&&s.readOnly)}
+function meIdx(){if(!isRO())return me.p;if(!me.name)return null;var k=PLAYERS.indexOf(me.name);return k>=0?k:null}
 function sidQ(sep){return state&&state.sid?sep+"sid="+encodeURIComponent(state.sid):""}
 function freshMatch(f){return {a:[f[0],f[1]],b:[f[2],f[3]],manual:false,games:[0,0],p:[0,0],adv:null,deuceN:0,sudden:false,done:false,hn:0}}
 function fixedSchedule(){var ms=[];for(var m=0;m<DEFAULT_M;m++)ms.push(freshMatch(FIXED.slice(m*4,m*4+4)));return {players:DEFAULT_PLAYERS.slice(),cur:null,matches:ms}}
@@ -334,11 +335,11 @@ function adopt(r){
   var announce=switched&&synced&&!quiet;
   if(announce){if(modalIsOpen())closeModal();toast("Sesi aktif: "+((r.session&&r.session.name)||""))}
   if(switched)quiet=false;
-  if(fixMe()){
+  if(!isRO()&&fixMe()){
     if(announce)setTimeout(function(){if(!modalIsOpen())pickPlayer()},350);
     else if(!modalIsOpen())pickPlayer();
   }
-  if(isNew&&me.photo&&me.p!==null)photos[me.p]=me.photo;
+  if(isNew&&!isRO()&&me.photo&&me.p!==null)photos[me.p]=me.photo;
   synced=true;
   try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
 }
@@ -476,8 +477,9 @@ function avatar(p,size){
   return '<s-avatar'+src+' initials="'+esc(PLAYERS[p].charAt(0))+'" alt="'+esc(PLAYERS[p])+'" size="'+avatarSize(size)+'"></s-avatar>';
 }
 function renderChip(){
-  var h;
-  if(me.p===null)h=btn('variant="primary" data-act="pick"','Pilih namamu');
+  var h,mi=meIdx();
+  if(mi===null)h=isRO()?'':btn('variant="primary" data-act="pick"','Pilih namamu');
+  else if(isRO())h='<s-stack class="chip" direction="inline" alignItems="center" gap="small">'+avatar(mi,34)+'<s-text type="strong">Kamu: '+esc(PLAYERS[mi])+'</s-text></s-stack>';
   else h='<s-clickable class="chip" data-act="profile" accessibilityLabel="Profil '+esc(PLAYERS[me.p])+'"><s-stack direction="inline" alignItems="center" gap="small">'+avatar(me.p,34)+'<s-text type="strong">Kamu: '+esc(PLAYERS[me.p])+'</s-text></s-stack></s-clickable>';
   h+='<s-text id="sync" color="subdued"></s-text>';
   $("chip").innerHTML=h;
@@ -751,7 +753,7 @@ function banner(){
   return '<s-banner class="gap" tone="info" heading="Match '+(c+1)+' sedang main">Siapa saja bisa mencatat poin di kartu bertanda ungu. Skor tampil live di semua HP.</s-banner>';
 }
 function firstOpen(){var n=state.matches.length,c=state.cur;if(typeof c==="number"&&c>=0&&c<n&&!state.matches[c].done)return c;for(var i=0;i<n;i++)if(!state.matches[i].done)return i;return -1}
-function nm(p){return p===me.p?'<span class="me-n">'+esc(PLAYERS[p])+'</span>':esc(PLAYERS[p])}
+function nm(p){return p===meIdx()?'<span class="me-n">'+esc(PLAYERS[p])+'</span>':esc(PLAYERS[p])}
 
 function teamHtml(t,win){
   var tone=win?' tone="success"':'';
@@ -813,17 +815,18 @@ function renderJadwal(){
 }
 function renderKlasemen(){
   var s=ranked(),h=banner()+'<div class="kl"><aside class="kl-side">';
-  if(me.p!==null){
-    var mine=s.filter(function(r){return r.i===me.p})[0];
-    h+='<s-section><s-stack direction="inline" alignItems="center" gap="base">'+avatar(me.p,64)+'<s-stack gap="small-200"><s-heading>Recap '+esc(PLAYERS[me.p])+'</s-heading><s-text color="subdued">'+(mine.played?mine.played+' match selesai · '+mine.w+' menang':'Muncul setelah match pertamamu selesai')+'</s-text>'+btn('variant="primary" data-act="recap" data-p="'+me.p+'"','Lihat recap-ku')+'</s-stack></s-stack></s-section>';
-  }else{
+  var mi=meIdx();
+  if(mi!==null){
+    var mine=s.filter(function(r){return r.i===mi})[0];
+    h+='<s-section><s-stack direction="inline" alignItems="center" gap="base">'+avatar(mi,64)+'<s-stack gap="small-200"><s-heading>Recap '+esc(PLAYERS[mi])+'</s-heading><s-text color="subdued">'+(mine.played?mine.played+' match selesai · '+mine.w+' menang':'Muncul setelah match pertamamu selesai')+'</s-text>'+btn('variant="primary" data-act="recap" data-p="'+mi+'"','Lihat recap-ku')+'</s-stack></s-stack></s-section>';
+  }else if(!isRO()){
     h+='<s-section><s-stack gap="small-200"><s-heading>Mau recap sendiri?</s-heading><s-text color="subdued">Pilih namamu dan ambil selfie dulu.</s-text>'+btn('variant="primary" data-act="pick"','Pilih namamu')+'</s-stack></s-section>';
   }
   h+='</aside><div class="kl-main"><s-section padding="none"><s-table>';
   h+='<s-table-header-row><s-table-header listSlot="primary">Pemain</s-table-header><s-table-header listSlot="inline" format="numeric">Main</s-table-header><s-table-header listSlot="inline" format="numeric">Menang</s-table-header><s-table-header listSlot="inline" format="numeric">Kalah</s-table-header><s-table-header listSlot="inline" format="numeric">Game</s-table-header><s-table-header listSlot="inline" format="numeric">Selisih</s-table-header><s-table-header listSlot="secondary">Recap</s-table-header></s-table-header-row><s-table-body>';
   s.forEach(function(r,idx){
     var d=r.gw-r.gl,top=(idx===0&&r.played>0);
-    var name='<span class="pn"><b'+(top?' class="topn"':'')+'>'+(idx+1)+'. '+esc(r.name)+'</b>'+(r.i===me.p?'<s-badge tone="info">kamu</s-badge>':'')+'<span class="cnt">main '+r.played+'/'+r.sched+'</span></span>';
+    var name='<span class="pn"><b'+(top?' class="topn"':'')+'>'+(idx+1)+'. '+esc(r.name)+'</b>'+(r.i===mi?'<s-badge tone="info">kamu</s-badge>':'')+'<span class="cnt">main '+r.played+'/'+r.sched+'</span></span>';
     /* lbl: visible label in the phone list only; lo: column hidden in the phone list */
     var num=function(v,lbl,lo){return '<s-table-cell'+(lo?' class="lo"':'')+'><span class="num">'+(lbl?'<span class="lbl">'+lbl+' </span>':'')+v+'</span></s-table-cell>'};
     h+='<s-table-row><s-table-cell>'+name+'</s-table-cell>'+num(r.played+'/'+r.sched,'',1)+num(r.w,'Menang')+num(r.l,'Kalah')+num(r.gw+'–'+r.gl,'',1)+num((d>0?'+':'')+d,'Selisih')+'<s-table-cell><span class="rc">'+btn('variant="secondary" data-act="recap" data-p="'+r.i+'"','Recap')+'</span></s-table-cell></s-table-row>';
@@ -844,7 +847,7 @@ function renderPemain(){
       slots.push("Match "+(i+1)+" ("+(m.manual?"game manual":slotTime(i).split("–")[0])+")");
     });
     var ol=Object.keys(opps).map(function(k){return k+(opps[k]>1?" ×"+opps[k]:"")}).join(", ");
-    h+='<div class="pcard"><s-section heading="'+esc(n)+(p===me.p?' (kamu)':'')+'"><s-stack gap="small-200"><s-paragraph><s-text color="subdued">Main di:</s-text> '+esc(slots.join(", "))+'</s-paragraph><s-paragraph><s-text color="subdued">Partner:</s-text> '+esc(partners.join(", "))+'</s-paragraph><s-paragraph><s-text color="subdued">Lawan:</s-text> '+esc(ol)+'</s-paragraph></s-stack></s-section></div>';
+    h+='<div class="pcard"><s-section heading="'+esc(n)+(p===meIdx()?' (kamu)':'')+'"><s-stack gap="small-200"><s-paragraph><s-text color="subdued">Main di:</s-text> '+esc(slots.join(", "))+'</s-paragraph><s-paragraph><s-text color="subdued">Partner:</s-text> '+esc(partners.join(", "))+'</s-paragraph><s-paragraph><s-text color="subdued">Lawan:</s-text> '+esc(ol)+'</s-paragraph></s-stack></s-section></div>';
   });
   $("pemain").innerHTML=h+'</div>';
 }
