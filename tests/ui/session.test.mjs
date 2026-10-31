@@ -189,3 +189,50 @@ test("klasemen: on a phone the match count sits on its own line under the name",
   assert.ok(g.cntTop >= g.nameBottom - 0.5, `cnt top ${g.cntTop} should be below name bottom ${g.nameBottom}`);
   await ctx.close();
 });
+
+test("history: open an old session read-only, go back, or make it active", async () => {
+  const { page, ctx, errors } = await open({ routes: fakeApi() });
+  await waitLive(page);
+  await createSession(page);
+  await titleIs(page, "Mabar Kamis");
+
+  await page.click('[data-act="hist"]');
+  await waitModal(page, true);
+  await page.waitForSelector('s-modal [data-act="histopen"]');
+  assert.equal(await page.locator('s-modal [data-act="histopen"]').count(), 2);
+  await page.click('s-modal [data-act="histopen"][data-id="halloween"]');
+  await waitModal(page, false);
+  await page.waitForFunction(() => document.getElementById("sTitle").textContent === "Halloween Tennis" && document.querySelector("#jadwal s-banner[heading='Sesi lama']"));
+  for (const sel of ["[data-pt]", "[data-sub]", "[data-setcur]", '[data-act="addgame"]', '[data-act="addplayer"]', "#tools s-button"]) {
+    assert.equal(await page.locator(sel).count(), 0, sel);
+  }
+  assert.equal(await page.locator('[data-act="histback"]').count(), 1);
+  assert.equal(await page.locator(".match").count(), 10);
+
+  await page.click('[data-act="histback"]');
+  await titleIs(page, "Mabar Kamis");
+  assert.equal(await page.locator("#jadwal s-banner[heading='Sesi lama']").count(), 0);
+  assert.equal(await page.locator('[data-act="addgame"]').count(), 1);
+
+  // make the old one active again
+  await page.click('[data-act="hist"]');
+  await page.waitForSelector('s-modal [data-act="histopen"]');
+  await page.click('s-modal [data-act="histopen"][data-id="halloween"]');
+  await page.waitForSelector('[data-act="histactivate"]');
+  await page.click('[data-act="histactivate"]');
+  await page.waitForFunction(() => !document.querySelector("#jadwal s-banner[heading='Sesi lama']") && document.querySelector('[data-act="addgame"]'));
+  assert.equal(await page.evaluate(async () => (await (await fetch("/api/sessions")).json()).active), "halloween");
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test("writes to an old session are refused even if the controls were somehow used", async () => {
+  const { page, ctx } = await open({ routes: fakeApi() });
+  await waitLive(page);
+  await createSession(page);
+  await titleIs(page, "Mabar Kamis");
+  const status = await page.evaluate(async () =>
+    (await fetch("/api/state?sid=halloween", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "setcurrent", i: 1 }) })).status);
+  assert.equal(status, 409);
+  await ctx.close();
+});

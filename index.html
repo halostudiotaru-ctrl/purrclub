@@ -358,7 +358,7 @@ function pull(force){
   return api("/api/state"+(viewSid?"?sid="+encodeURIComponent(viewSid):"")).then(function(s){
     setOnline(true);
     var changed=false;
-    if(s.matches&&(inflight===0||force)&&(s.rev!==rev||(s.sid||null)!==(state.sid||null))){adopt(s);rev=s.rev;changed=true}
+    if(s.matches&&(inflight===0||force)&&(s.rev!==rev||(s.sid||null)!==(state.sid||null)||!!(s.session&&s.session.readOnly)!==!!(state.session&&state.session.readOnly))){adopt(s);rev=s.rev;changed=true}
     var jobs=[];
     Object.keys(s.photos||{}).forEach(function(k){
       var p=+k;
@@ -412,8 +412,8 @@ function applyPoint(m,s){
 }
 function curIdx(){var i=firstOpen();return i<0?state.matches.length:i}
 function inMatch(i,p){var m=state.matches[i];return p!==null&&m.a.concat(m.b).indexOf(p)>=0}
-function canScore(i){return i===curIdx()&&!state.matches[i].done}
-function canAct(i){var m=state.matches[i];return i===curIdx()||m.done||(m.hn||0)>0}
+function canScore(i){return !isRO()&&i===curIdx()&&!state.matches[i].done}
+function canAct(i){var m=state.matches[i];return !isRO()&&(i===curIdx()||m.done||(m.hn||0)>0)}
 function setCurrent(i){var m=state.matches[i];if(m.done||i===curIdx())return;state.cur=i;render();sendOp({op:"setcurrent",i:i,p:me.p}).then(function(ok){if(ok)toast("Match "+(i+1)+" sedang main")})}
 function addPoint(i,s){
   if(!canScore(i))return;
@@ -540,7 +540,7 @@ function fairSummary(n,M){var slots=4*M,min=Math.floor(slots/n),extra=slots%n;re
 function gcd(a,b){return b?gcd(b,a%b):a}
 function fairSuggest(n,M,max){var step=n/gcd(n,4);if(M%step===0)return {down:null,up:null};var d=Math.floor(M/step)*step,u=d+step;return {down:d>=1?d:null,up:u<=max?u:null}}
 function renderSessBar(){
-  $("sessbar").innerHTML=btn('variant="secondary" data-act="wznew"','+ Sesi baru');
+  $("sessbar").innerHTML=btn('variant="secondary" data-act="wznew"','+ Sesi baru')+btn('variant="secondary" data-act="hist"','Riwayat');
 }
 function wzOpen(){
   var d=new Date();
@@ -649,6 +649,22 @@ function wzGo(){
     .then(function(){closeModal();viewSid=null;pull(true)})
     .catch(function(e){if(wz)wz.busy=false;toast(e.message)});
 }
+var histActive=null;
+function histModal(){
+  openModal("Riwayat sesi",'<div id="histBody"><s-text color="subdued">Memuat…</s-text></div>',{secondary:{act:"close",label:"Tutup"}});
+  api("/api/sessions").then(function(r){
+    var box=$("histBody");if(!box)return;
+    histActive=r.active;
+    var rows=r.sessions.map(function(s){
+      var shown=viewSid?s.id===viewSid:s.id===r.active;
+      return '<s-clickable class="pickItem'+(shown?' sel':'')+'" data-act="histopen" data-id="'+esc(s.id)+'" accessibilityLabel="'+esc(s.name)+'"><s-stack gap="small-200"><s-stack direction="inline" alignItems="center" gap="small"><s-text type="strong">'+esc(s.name)+'</s-text>'+(s.id===r.active?'<s-badge tone="success">Aktif</s-badge>':'')+'</s-stack><s-text color="subdued">'+esc((s.note?s.note+" · ":"")+s.playerCount+" pemain · "+s.doneCount+"/"+s.matchCount+" match")+'</s-text></s-stack></s-clickable>';
+    }).join("");
+    box.innerHTML='<s-stack gap="small">'+rows+'</s-stack>';
+  }).catch(function(){var box=$("histBody");if(box)box.innerHTML='<s-text color="subdued">Gagal memuat riwayat. Coba lagi.</s-text>'});
+}
+function roBar(){
+  return '<s-stack class="toolbar" direction="inline" gap="small">'+btn('variant="primary" data-act="histback"','Kembali ke sesi aktif')+btn('variant="secondary" data-act="histactivate"','Jadikan aktif')+'</s-stack>';
+}
 function selfieStep(){
   var h='<s-stack alignItems="center" gap="base">'+avatar(me.p,140)+'<s-paragraph color="subdued">Foto dipakai di kartu recap dan tersimpan di HP ini saja.</s-paragraph></s-stack>';
   h+='<s-stack gap="small">'+btn('variant="primary" inlineSize="fill" data-act="selfie"',me.photo?'Ambil ulang selfie':'Ambil selfie')+btn('variant="secondary" inlineSize="fill" data-act="gallery"','Pilih dari galeri')+btn('variant="tertiary" inlineSize="fill" data-act="close"',me.photo?'Selesai':'Lewati')+'</s-stack>';
@@ -729,6 +745,7 @@ function titleFor(d){
 
 /* ---------- tampilan ---------- */
 function banner(){
+  if(isRO())return '<s-banner class="gap" tone="warning" heading="Sesi lama">Kamu sedang melihat sesi ini hanya-lihat. Skor tidak bisa diubah.</s-banner>';
   var c=firstOpen();
   if(c<0)return '';
   return '<s-banner class="gap" tone="info" heading="Match '+(c+1)+' sedang main">Siapa saja bisa mencatat poin di kartu bertanda ungu. Skor tampil live di semua HP.</s-banner>';
@@ -755,7 +772,7 @@ function sessionCard(){
   return h+'</s-stack>';
 }
 function renderJadwal(){
-  var cur=firstOpen(),h=sessionCard()+banner()+'<s-stack class="toolbar" direction="inline" gap="small">'+btn('variant="secondary" data-act="addgame"','+ Game manual')+btn('variant="secondary" data-act="addplayer"','+ Pemain baru')+'</s-stack><div class="matches">';
+  var cur=firstOpen(),h=sessionCard()+banner()+(isRO()?roBar():'<s-stack class="toolbar" direction="inline" gap="small">'+btn('variant="secondary" data-act="addgame"','+ Game manual')+btn('variant="secondary" data-act="addplayer"','+ Pemain baru')+'</s-stack>')+'<div class="matches">';
   state.matches.forEach(function(m,i){
     var players=m.a.concat(m.b);
     var rest=PLAYERS.map(function(_,k){return k}).filter(function(k){return players.indexOf(k)<0});
@@ -784,7 +801,7 @@ function renderJadwal(){
       if(started||m.done)mini+=btn('variant="secondary" data-reset="'+i+'"','Reset match');
       if(mini)h+='<s-stack direction="inline" gap="small">'+mini+'</s-stack>';
     }
-    if(!m.done){
+    if(!m.done&&!isRO()){
       var mgmt=btn('variant="secondary" data-sub="'+i+'"','Ganti pemain');
       if(!live)mgmt+=btn('variant="secondary" data-setcur="'+i+'"','Jadikan sedang main');
       h+='<s-stack direction="inline" gap="small">'+mgmt+'</s-stack>';
@@ -846,7 +863,7 @@ function renderHeader(){
 }
 function render(){
   renderHeader();renderSessBar();renderChip();renderJadwal();renderKlasemen();renderPemain();
-  $("tools").innerHTML=btn('variant="secondary" tone="critical" data-act="resetall"','Hapus semua skor');
+  $("tools").innerHTML=isRO()?'':btn('variant="secondary" tone="critical" data-act="resetall"','Hapus semua skor');
 }
 
 /* ---------- kartu recap (1080 x 1920, ukuran story) ---------- */
@@ -999,6 +1016,21 @@ document.addEventListener("click",function(e){
   else if(a==="wzcopyfrom"&&wz){wzCopyFrom(t.dataset.id)}
   else if(a==="wzsug"&&wz){wz.dur=String((+t.dataset.m)*(+wz.slot));wz.preview=null;wz3()}
   else if(a==="wzgo"&&wz){wzGo()}
+  else if(a==="hist"){histModal()}
+  else if(a==="histopen"){
+    var hid=t.dataset.id,cur0=viewSid;
+    viewSid=(hid===histActive)?null:hid;
+    if(viewSid!==cur0){quiet=true;rev=0}
+    closeModal();pull(true);
+  }
+  else if(a==="histback"){viewSid=null;quiet=true;rev=0;pull(true)}
+  else if(a==="histactivate"&&viewSid){
+    var aid=viewSid;
+    api("/api/sessions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({op:"activate",id:aid})})
+      .then(function(){viewSid=null;rev=0;return pull(true)})
+      .then(function(){toast("Sesi diaktifkan: "+((sess()&&sess().name)||""))})
+      .catch(function(e){toast(e.message)});
+  }
   else if(a==="pick"){pickPlayer()}
   else if(a==="choose"){var np=+t.dataset.p;if(np!==me.p)me.photo=null;me.p=np;me.name=PLAYERS[np];saveMe();render();selfieStep()}
   else if(a==="profile"){profileModal()}
