@@ -276,3 +276,85 @@ test("viewing an old session never touches the stored identity or opens the name
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+test("reloading while viewing an old session keeps the stored identity and does not open the name prompt", async () => {
+  const { page, ctx } = await open({ routes: fakeApi(), me: null });      // me: null so the reload does not re-seed the identity
+  await waitLive(page);
+  const mk = (name, players) => ({ ...body, name, players });
+  const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem("halloween-tennis-me-v1")));
+  const choose = async () => {
+    await waitModal(page, true, 4000);
+    await page.click('s-modal [data-act="choose"][data-p="0"]');
+    await page.waitForSelector('s-modal [data-act="close"]');
+    await page.click('s-modal [data-act="close"]');
+    await waitModal(page, false);
+  };
+  await choose();                                                          // boot prompt on the Halloween roster
+  await createSession(page, mk("Sesi A", ["A1", "A2", "A3", "A4"]));
+  await titleIs(page, "Sesi A");
+  await choose();
+  await createSession(page, mk("Sesi B", ["B1", "B2", "B3", "B4"]));
+  await titleIs(page, "Sesi B");
+  await choose();
+  assert.equal((await stored()).name, "B1");
+
+  await page.click('[data-act="hist"]');
+  await waitModal(page, true);
+  await page.waitForSelector('s-modal [data-act="histopen"]');
+  await page.locator('s-modal [data-act="histopen"]', { hasText: "Sesi A" }).click();
+  await page.waitForFunction(() => document.getElementById("sTitle").textContent === "Sesi A" && document.querySelector("#jadwal s-banner[heading='Sesi lama']"));
+
+  await page.reload();
+  await waitLive(page);
+  await page.waitForTimeout(1200);
+  assert.equal((await stored()).name, "B1");
+  assert.equal(await page.evaluate(() => { const d = document.getElementById("modal").shadowRoot.querySelector("dialog"); return !!(d && d.open); }), false);
+  await ctx.close();
+});
+
+test("a slow stale poll response never flips the view back", async () => {
+  const api = fakeApi();
+  let armed = false, held = false;
+  const routes = [[/\/api\/state(\?|$)/, async (route) => {
+    if (armed && !held && route.request().method() === "GET") {
+      held = true;
+      let out;
+      await api[0][1]({ request: () => route.request(), fulfill: async (o) => { out = o; } });   // payload captured now, before the view is opened
+      await new Promise((r) => setTimeout(r, 2500));
+      await route.fulfill(out);
+    } else await api[0][1](route);
+  }], api[1], api[2]];
+  const { page, ctx } = await open({ routes });
+  await waitLive(page);
+  armed = true;
+  while (!held) await new Promise((r) => setTimeout(r, 50));               // a no-sid poll is now in flight, holding the old (non read-only) state
+  await createSession(page);
+  await page.click('[data-act="hist"]');
+  await waitModal(page, true);
+  await page.waitForSelector('s-modal [data-act="histopen"]');
+  await page.click('s-modal [data-act="histopen"][data-id="halloween"]');
+  await page.waitForSelector("#jadwal s-banner[heading='Sesi lama']");
+  for (let i = 0; i < 8; i++) {                                            // 4 s: the stale response lands in the middle
+    await page.waitForTimeout(500);
+    assert.equal(await page.locator("#jadwal s-banner[heading='Sesi lama']").count(), 1);
+    assert.equal(await page.evaluate(() => document.getElementById("sTitle").textContent), "Halloween Tennis");
+  }
+  await ctx.close();
+});
+
+test("a viewed session that becomes active is followed again", async () => {
+  const { page, ctx } = await open({ routes: fakeApi() });
+  await waitLive(page);
+  await createSession(page);
+  await titleIs(page, "Mabar Kamis");
+  await page.click('[data-act="hist"]');
+  await waitModal(page, true);
+  await page.waitForSelector('s-modal [data-act="histopen"]');
+  await page.click('s-modal [data-act="histopen"][data-id="halloween"]');
+  await page.waitForSelector("#jadwal s-banner[heading='Sesi lama']");
+  await page.evaluate(async () => { await fetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op: "activate", id: "halloween" }) }); });
+  await page.waitForFunction(() => !document.querySelector("#jadwal s-banner[heading='Sesi lama']") && document.querySelector('[data-act="addgame"]'), null, { timeout: 6000 });
+  await createSession(page, { ...body, name: "Sesi Baru" });
+  await titleIs(page, "Sesi Baru");
+  await ctx.close();
+});

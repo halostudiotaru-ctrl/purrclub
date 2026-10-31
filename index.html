@@ -253,6 +253,7 @@ var BASE="https://claude.ai/artifact/UFPGpWiytzJERZ9XPK2Xsf";
 var FIXED=[1,2,9,7,0,8,6,3,7,2,4,5,1,6,3,9,0,5,8,4,7,3,9,6,2,5,0,1,7,4,8,9,6,0,5,1,8,3,4,2];
 var state=null,me={p:null,photo:null,name:null},photos={},photoVer={},pending=null,recapBlob=null,recapName="recap.png",toastT=null;
 var rev=0,inflight=0,online=null,uploadingFor=null;
+var pullSeq=0,appliedSeq=0;
 var viewSid=null,quiet=false,synced=false,hdrKey=null,wz=null,LEGACY_ID="halloween";
 var HEAD0={title:$("sTitle").innerHTML,sub:$("sSub").innerHTML,rules:$("rules").innerHTML,doc:document.title};
 
@@ -300,7 +301,7 @@ function matchLabel(m,i){return m.manual?"Game manual":slotTime(i)}
 
 /* ---------- penyimpanan ---------- */
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
-function load(){try{var r=localStorage.getItem(KEY);if(r){var s=JSON.parse(r);if(s&&s.matches&&s.matches.length>=1){if(!Array.isArray(s.players))s.players=DEFAULT_PLAYERS.slice();return s}}}catch(e){}return null}
+function load(){try{var r=localStorage.getItem(KEY);if(r){var s=JSON.parse(r);if(s&&s.session&&s.session.readOnly)return null;if(s&&s.matches&&s.matches.length>=1){if(!Array.isArray(s.players))s.players=DEFAULT_PLAYERS.slice();return s}}}catch(e){}return null}
 function saveMe(){try{localStorage.setItem(MEKEY,JSON.stringify(me))}catch(e){}}
 function loadMe(){try{var r=localStorage.getItem(MEKEY);if(r){var o=JSON.parse(r);if(o&&typeof o==="object")return {p:(typeof o.p==="number"?o.p:null),photo:o.photo||null,name:(typeof o.name==="string"?o.name:null)}}}catch(e){}return {p:null,photo:null,name:null}}
 
@@ -341,13 +342,15 @@ function adopt(r){
   }
   if(isNew&&!isRO()&&me.photo&&me.p!==null)photos[me.p]=me.photo;
   synced=true;
-  try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+  if(r.sid&&r.sid===r.active)viewSid=null;
+  if(!isRO()){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 }
 function sendOp(body){
   if(isRO()){toast("Sesi lama hanya bisa dilihat");return Promise.resolve(false)}
   inflight++;
+  var sentSid=state.sid;
   return api("/api/state"+sidQ("?"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
-    .then(function(r){setOnline(true);inflight--;if(inflight===0){adopt(r);rev=r.rev;render()}return true})
+    .then(function(r){setOnline(true);inflight--;if(inflight===0&&state.sid===sentSid){adopt(r);rev=r.rev;render()}return true})
     .catch(function(e){
       inflight--;
       if(e.status&&e.status<500){toast(e.message)}else{setOnline(false);toast("Gagal kirim skor, cek koneksi")}
@@ -356,7 +359,10 @@ function sendOp(body){
     });
 }
 function pull(force){
+  var seq=++pullSeq,want=viewSid;
   return api("/api/state"+(viewSid?"?sid="+encodeURIComponent(viewSid):"")).then(function(s){
+    if(want!==viewSid||seq<appliedSeq)return;
+    appliedSeq=seq;
     setOnline(true);
     var changed=false;
     if(s.matches&&(inflight===0||force)&&(s.rev!==rev||(s.sid||null)!==(state.sid||null)||!!(s.session&&s.session.readOnly)!==!!(state.session&&state.session.readOnly))){adopt(s);rev=s.rev;changed=true}
@@ -1071,11 +1077,12 @@ me=loadMe();
 if(me.photo&&me.p!==null)photos[me.p]=me.photo;
 state=load()||fixedSchedule();
 PLAYERS=state.players;
-fixMe();
+if(!isRO())fixMe();
 render();
-if(me.p===null)setTimeout(pickPlayer,350);
+if(me.p===null&&!isRO())setTimeout(pickPlayer,350);
 pull(true);
-setInterval(pull,3000);
+setInterval(function(){if(!document.hidden)pull()},3000);
+document.addEventListener("visibilitychange",function(){if(!document.hidden)pull(true)});
 })();
 </script>
 </body>
