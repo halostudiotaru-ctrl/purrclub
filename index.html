@@ -519,14 +519,26 @@ function gameModal(){
   openModal("Game manual",'<div id="gameBody"></div>',{secondary:{act:"close",label:"Batal"},primary:{act:"gamego",label:"Mulai game"}});
   paintGame();
 }
+function suggestIds(){
+  var g=state.suggest;
+  if(!g||!g.a||!g.b)return [];
+  var ids=g.a.concat(g.b);
+  return ids.every(function(p){return Number.isInteger(p)&&p>=0&&p<PLAYERS.length})?ids:[];
+}
+function gameBtn(p,sel,rec,r){
+  return '<s-clickable class="pickItem'+(sel?' sel':'')+'" data-act="gametoggle" data-p="'+p+'" accessibilityLabel="'+esc(PLAYERS[p])+'"><s-stack direction="inline" alignItems="center" gap="small">'+avatar(p,32)+'<s-stack gap="small-200"><s-text type="strong">'+esc(PLAYERS[p])+'</s-text><s-text color="subdued">main '+r.played+'/'+r.sched+'</s-text></s-stack>'+(rec?'<s-badge tone="info">Disarankan</s-badge>':'')+'</s-stack></s-clickable>';
+}
 function paintGame(){
   var box=$("gameBody");if(!box||!gameCtx)return;
   var keep=($("gpIn")||{}).value||"";
   var sel=gameCtx.sel=gameCtx.sel.filter(function(p){return p<PLAYERS.length});
+  var rec=suggestIds(),st=stats();
+  var order=rec.concat(st.slice().sort(function(a,b){return a.sched-b.sched||a.played-b.played||a.i-b.i}).map(function(r){return r.i}).filter(function(p){return rec.indexOf(p)<0}));
   function nameAt(k){return sel[k]!==undefined?PLAYERS[sel[k]]:"…"}
   var h='<s-stack gap="base"><s-paragraph color="subdued">Pilih 4 pemain. Dua yang pertama jadi Tim A, dua berikutnya Tim B. Ketuk lagi untuk batal.</s-paragraph>';
+  if(rec.length===4)h+='<s-stack direction="inline" gap="small" alignItems="center">'+btn('variant="secondary" data-act="gamesuggest"','Pakai saran')+'<s-text color="subdued">Pemain dengan jumlah main paling sedikit</s-text></s-stack>';
   h+='<s-text type="strong">Tim A: '+esc(nameAt(0)+" & "+nameAt(1))+'</s-text><s-text type="strong">Tim B: '+esc(nameAt(2)+" & "+nameAt(3))+'</s-text><div class="pick">';
-  PLAYERS.forEach(function(n,p){h+=pickBtn('data-act="gametoggle" data-p="'+p+'"',p,sel.indexOf(p)>=0)});
+  order.forEach(function(p){h+=gameBtn(p,sel.indexOf(p)>=0,rec.indexOf(p)>=0,st[p])});
   h+='</div><s-stack direction="inline" gap="small" alignItems="end"><s-text-field id="gpIn" label="Pemain baru" placeholder="Nama" maxlength="20" autocomplete="off"></s-text-field>'+btn('variant="secondary" data-act="gameaddplayer"','Tambah')+'</s-stack></s-stack>';
   box.innerHTML=h;
   var f=$("gpIn");if(f)f.value=keep;
@@ -998,6 +1010,7 @@ document.addEventListener("click",function(e){
     if(gi>=0)gameCtx.sel.splice(gi,1);else if(gameCtx.sel.length<4)gameCtx.sel.push(gp);
     paintGame();
   }
+  else if(a==="gamesuggest"&&gameCtx){var ids=suggestIds();if(ids.length===4){gameCtx.sel=ids;paintGame()}}
   else if(a==="gameaddplayer"&&gameCtx){
     var gn=readName("gpIn");
     if(!gn){toast("Isi namanya dulu");return}

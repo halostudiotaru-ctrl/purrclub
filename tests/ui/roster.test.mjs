@@ -98,3 +98,42 @@ test("a player name with HTML is rendered as text, never injected", async () => 
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+test("manual game: the four players with the fewest matches are suggested and 'Pakai saran' fills them", async () => {
+  const { page, ctx, errors } = await open({ routes: fakeApi() });
+  await waitLive(page);
+  await page.click('[data-act="addgame"]');
+  await waitModal(page, true);
+  assert.equal(await page.locator("s-modal .pickItem s-badge").count(), 4);
+  assert.ok((await page.locator("s-modal").first().textContent()).includes("Disarankan"));
+  assert.notEqual(await page.locator('s-modal [data-act="gamego"]').getAttribute("disabled"), null);
+  const sug = await page.evaluate(async () => (await (await fetch("/api/state")).json()).suggest);
+  await page.click('s-modal [data-act="gamesuggest"]');
+  const sel = await page.locator("s-modal .pickItem.sel").evaluateAll((els) => els.map((e) => +e.dataset.p));
+  assert.deepEqual(sel, [...sug.a, ...sug.b]);
+  assert.equal(await page.locator('s-modal [data-act="gamego"]').getAttribute("disabled"), null);
+  // the picks stay editable
+  await page.click(`s-modal [data-act="gametoggle"][data-p="${sel[3]}"]`);
+  assert.notEqual(await page.locator('s-modal [data-act="gamego"]').getAttribute("disabled"), null);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test("manual game: a new player with no matches goes to the top of the list with the count shown", async () => {
+  const { page, ctx } = await open({ routes: fakeApi() });
+  await waitLive(page);
+  await page.click('[data-act="addgame"]');
+  await waitModal(page, true);
+  await page.fill("s-text-field#gpIn input", "Tamu");
+  await page.click('s-modal [data-act="gameaddplayer"]');
+  await page.waitForSelector('s-modal [data-act="gametoggle"][data-p="10"]');
+  // the four suggested players come first (the new player is one of them); everyone after them is not suggested
+  const items = page.locator("s-modal .pickItem");
+  for (let k = 0; k < 4; k++) assert.ok((await items.nth(k).textContent()).includes("Disarankan"), `item ${k}`);
+  assert.ok(!(await items.nth(4).textContent()).includes("Disarankan"));
+  const tamu = page.locator('s-modal [data-act="gametoggle"][data-p="10"]');
+  assert.ok((await tamu.textContent()).includes("Disarankan"));
+  assert.ok((await tamu.textContent()).includes("main 0/0"));
+  assert.ok((await page.locator('s-modal [data-act="gametoggle"][data-p="9"]').textContent()).includes("main 0/4"));
+  await ctx.close();
+});
