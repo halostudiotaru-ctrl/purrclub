@@ -177,3 +177,15 @@ test("klasemen: phones show the match count under the name; wide screens keep th
     await ctx.close();
   }
 });
+
+test("klasemen: on a phone the match count sits on its own line under the name", async () => {
+  const { page, ctx } = await open({ routes: fakeApi(), width: 390, height: 900 });
+  await waitLive(page);
+  await page.click('[data-tab="klasemen"]');
+  const g = await page.evaluate(() => {
+    const pn = document.querySelector("#klasemen .pn");
+    return { nameBottom: pn.querySelector("b").getBoundingClientRect().bottom, cntTop: pn.querySelector(".cnt").getBoundingClientRect().top };
+  });
+  assert.ok(g.cntTop >= g.nameBottom - 0.5, `cnt top ${g.cntTop} should be below name bottom ${g.nameBottom}`);
+  await ctx.close();
+});
