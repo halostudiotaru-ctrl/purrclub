@@ -35,8 +35,7 @@ Redis keys:
 
 | Purpose | Key |
 |---|---|
-| Session list (id, name, createdAt) | `ht:sessions` |
-| Active session id | `ht:active` |
+| Session index `{active, list: [{id, name, createdAt}]}` (one key, so a poll costs one read for both) | `ht:sessions` |
 | Session state | `ht:session:<id>` |
 | Photo | `ht:photo:<id>:<p>`, versions in hash `ht:photov:<id>` |
 | Lock | `ht:lock:<id>`; list/activate use `ht:lock:sessions` |
@@ -64,11 +63,11 @@ Because the lowest counts are always chosen first, `max(plays) - min(plays) <= 1
 
 1. **Pengaturan:** name (default "Mabar <date>", max 40 chars), duration (quick picks 1 / 1,5 / 2 / 2,5 / 3 hours or custom minutes), minutes per match (default 30, 10-120), start time (default now rounded to 5 minutes).
 2. **Pemain:** type a name and "Tambah"; remove chips; "Ambil dari sesi sebelumnya" picks a session and copies its names and photos. 4 to 20 players, validated with the roster rules.
-3. **Ringkasan:** "N pemain, M match, tiap orang main X-Y game", the players who play one fewer, and a suggestion with nearby perfectly equal match counts. "Pakai saran" sets the duration to `M' * slotMin` and returns to the summary. "Mulai sesi" submits.
+3. **Ringkasan:** "N pemain, M match, tiap orang main X-Y game", the players who play one fewer, and a suggestion with nearby perfectly equal match counts. The names come from a dry run of the generator (`op: "preview"`, see API), so the summary shows exactly what "Mulai sesi" will create. "Pakai saran" sets the duration to `M' * slotMin` and returns to the summary. "Mulai sesi" submits.
 
 Perfectly equal needs `4M` divisible by `N`. Suggested counts are the nearest such `M'` below (if at least 1) and above (if at most 30).
 
-On success the new session becomes active and every phone follows it (toast "Sesi baru dimulai: <name>").
+On success the new session becomes active and every phone follows it (toast "Sesi aktif: <name>"; a phone cannot tell a new session from an activated old one, so the wording covers both).
 
 ## Session history and read-only view
 
@@ -93,9 +92,10 @@ In the "+ Game manual" modal:
 
 ## API
 
-- `GET /api/sessions` -> `{ active, sessions: [{id, name, note, createdAt, playerCount, matchCount, doneCount}] }`. The counts are computed by reading each session's state; the stored list only holds id, name and createdAt. The list is small, so no cached counts are kept.
+- `GET /api/sessions` -> `{ active, sessions: [{id, name, note, createdAt, players, playerCount, matchCount, doneCount}] }`, newest first. `players` (names) feeds "Ambil dari sesi sebelumnya". The counts are computed by reading each session's state; the stored list only holds id, name and createdAt. The list is small, so no cached counts are kept.
 - `POST /api/sessions`:
-  - create: `{name, players: string[], durationMin, slotMin, startTime, copyFrom?}`; validates the rules above (400 on invalid input, 409 on duplicate names), generates the schedule, writes the state, copies photos from `copyFrom` best effort (a copy failure does not fail the creation), sets it active, and returns the new state with the sessions list.
+  - preview: `{op: "preview", name, players, durationMin, slotMin, startTime}` runs the same validation and the generator and returns `{matches: [{a, b}], matchCount}` without writing anything.
+  - create: `{name, players: string[], durationMin, slotMin, startTime, note?, copyFrom?}` (`note` is the date label the client sends, max 40 chars); validates the rules above (400 on invalid input, 409 on duplicate names), generates the schedule, writes the state, copies photos from `copyFrom` best effort (a copy failure does not fail the creation), sets it active, and returns `{active, sessions}` (the same shape as `GET /api/sessions`); the client then polls the state.
   - activate: `{op: "activate", id}`.
 - `GET /api/state?sid=<id>` and `POST /api/state?sid=<id>`: without `sid`, the active session. The payload adds `sid`, `active`, `session: {name, note, config, readOnly}` and `suggest`. Write ops to a session that is not active return 409 "Sesi ini bukan sesi aktif".
 - `GET/POST /api/photo?sid=<id>`: same defaulting; the photo index bound stays `MAX_PLAYERS`.
@@ -105,7 +105,7 @@ All existing ops (`point`, `undo`, `resetmatch`, `setcurrent`, `substitute`, `ad
 ## Compatibility and rollout
 
 - Clients from the previous release call the API without `sid`, so they keep working against the active session, and extra payload fields are ignored. They follow a newly active session automatically.
-- The localStorage cache records the `sid` it belongs to; a cache for another session is ignored.
+- The localStorage cache holds the last state including its `sid`; it is shown until the first poll (about a second) and then replaced, never merged with another session's data.
 - No data migration step: the legacy session reuses its old keys.
 
 ## Files
